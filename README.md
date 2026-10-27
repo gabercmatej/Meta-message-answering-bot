@@ -1,4 +1,4 @@
-# PND Meta Message Answering Bot
+# Meta Message Answering Bot
 
 A production human-in-the-loop AI system that handles Facebook and Instagram comments and direct
 messages for a Slovenian legal advisory service. Signed Meta webhooks are stored durably and turned
