@@ -27,8 +27,8 @@ export function Dm({ variant, t, items, typing, status, busy, draft, setDraft, o
         <button className="ico" tabIndex={-1} aria-hidden="true"><Icon name="chevron-left" size={22} /></button>
         <Avatar kind="brand" size={ig ? 34 : 36} ring={ig} />
         <div className="who">
-          <strong>{t.brand}<span className="demo-tag">{t.demoTag}</span></strong>
-          <small>{t.device.activeNow}</small>
+          <strong>{t.brand}</strong>
+          <small>{t.device.activeNow}<span className="demo-tag">{t.demoTag}</span></small>
         </div>
         <div className="head-ico" aria-hidden="true">
           {ig ? (<><Icon name="phone" size={19} /><Icon name="video" size={20} /></>) : (<><Icon name="phone" size={20} /><Icon name="video" size={21} /><Icon name="info" size={20} /></>)}

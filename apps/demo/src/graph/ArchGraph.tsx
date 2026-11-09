@@ -102,7 +102,9 @@ export function ArchGraph({ t, lang, trace, steps, playback, reduced, deviceRef,
     } else {
       // Stacked: wires run in the margins beside the suggestion chips, so they visibly touch the device.
       const block = dev.parentElement?.getBoundingClientRect() ?? d;
-      const offPx = Math.max(6, Math.min(22, d.left / 2, (window.innerWidth - d.right) / 2));
+      // The phone can be narrower than its column (platform buttons and suggestions): clear the column edge too.
+      const pad = Math.max(0, Math.min(block.right - d.right, d.left - block.left));
+      const offPx = Math.max(6, Math.min(Math.min(22, d.left / 2, (window.innerWidth - d.right) / 2) + pad, d.left - 4, window.innerWidth - d.right - 4));
       next = {
         mode: 'below',
         gap: 0,

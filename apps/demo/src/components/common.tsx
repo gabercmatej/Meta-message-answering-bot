@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Dict } from '../i18n';
+import scales from '../assets/brand/pnd-scales-512.png';
 import { entry } from '../sim/knowledge';
 
 // ------------------------------------------------------------------------------ tooltip layer
@@ -108,11 +109,12 @@ export function FactText({ text, t }: { text: string; t: Dict }) {
 
 // ------------------------------------------------------------------------------ avatars
 
+/** Brand avatar: the official PND scales icon, unaltered, centred on a white circle (optionally with a story ring). */
 export function Avatar({ kind, size = 32, ring = false, initial }: { kind: 'brand' | 'visitor' | 'a' | 'b'; size?: number; ring?: boolean; initial?: string }) {
   const brand = kind === 'brand';
   return (
-    <span className={`avatar ${kind} ${ring ? 'ring' : ''}`} style={{ width: size, height: size, fontSize: brand ? size * 0.3 : size * 0.42 }} aria-hidden="true">
-      <span className="avatar-in">{brand ? 'PnD' : (initial ?? 'D')}</span>
+    <span className={`avatar ${kind} ${ring ? 'ring' : ''}`} style={{ width: size, height: size, fontSize: size * 0.42 }} aria-hidden="true">
+      <span className="avatar-in">{brand ? <img src={scales} alt="" draggable={false} /> : (initial ?? 'D')}</span>
     </span>
   );
 }
