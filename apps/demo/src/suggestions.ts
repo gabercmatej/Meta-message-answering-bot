@@ -1,19 +1,23 @@
 import { SCENARIOS } from './sim/scenarios';
 import type { Lang, Topic } from './sim/types';
 
-/** The four compact chips under the composer. `topic` is what the deterministic matcher yields (asserted in tests). */
+/** The six suggested messages shown as a 3x2 grid under the phone. `topic` is what the deterministic matcher yields (asserted in tests). */
 export const SUGGESTIONS: Record<Lang, ReadonlyArray<{ text: string; topic: Topic }>> = {
   en: [
     { text: 'Can my employer fire me?', topic: 'employment_termination' },
     { text: 'My landlord wants me out', topic: 'tenancy' },
     { text: 'How much is a consultation?', topic: 'price' },
-    { text: 'I haven’t been paid', topic: 'unpaid_salary' }
+    { text: 'I haven’t been paid', topic: 'unpaid_salary' },
+    { text: 'Do I need a lawyer to write a will?', topic: 'inheritance' },
+    { text: 'I would like to book an appointment.', topic: 'booking' }
   ],
   sl: [
     { text: 'Ali me lahko delodajalec odpusti?', topic: 'employment_termination' },
     { text: 'Najemodajalec me želi izseliti', topic: 'tenancy' },
     { text: 'Koliko stane posvet?', topic: 'price' },
-    { text: 'Plače nisem prejel', topic: 'unpaid_salary' }
+    { text: 'Plače nisem prejel', topic: 'unpaid_salary' },
+    { text: 'Ali potrebujem pravnika za sestavo oporoke?', topic: 'inheritance' },
+    { text: 'Rad bi naročil termin za posvet.', topic: 'booking' }
   ]
 };
 

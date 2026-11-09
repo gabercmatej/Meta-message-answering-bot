@@ -12,8 +12,6 @@ Built and operated for [Pravnik na dlani](https://pravniknadlani.si/), a Sloveni
 
 [**▶ Live interactive demo**](https://meta-message-answering-bot.vercel.app/) · [What is public](WHATS_PUBLIC.md) · [Architecture](docs/architecture.md) · [Autonomous LIVE mode](docs/autonomous-live-mode.md) · [Engineering challenges](docs/engineering-challenges.md) · [Quick start](#quick-start) · [Screenshots](#the-product)
 
-**[Try the live demo →](https://meta-message-answering-bot.vercel.app/)** Send a message in an Instagram- or Facebook-style mock and watch it travel through the architecture. Browser-only simulation: no real AI, no Meta API, no backend.
-
 </div>
 
 <p align="center">
@@ -123,39 +121,6 @@ The current admin console. Synthetic data, real UI ([provenance](#screenshot-pro
   </tr>
 </table>
 </details>
-
-## Interactive demo
-
-**[Open the live demo](https://meta-message-answering-bot.vercel.app/)** · source in [`apps/demo`](apps/demo/)
-
-Send a message from an Instagram-style or Messenger-style chat, or comment under an Instagram- or
-Facebook-style post (English or Slovenian), and watch the packet travel through the real topology:
-webhook and signature check, normalization and dedupe, the durable queue, context, classification,
-knowledge retrieval, the (simulated) model, the policy gate, validation, the scheduler, the only
-publisher, and delivery reconciliation. Each route follows the simulator's trace, so different
-messages take different paths: a human-only message stops at review, an AI outage takes the
-approved-fallback bypass, a duplicate webhook dies at the normalizer, a Meta 429 loops through retry,
-and an uncertain write is read back before anything is resent. The reply appears only after
-simulated delivery is confirmed; then the decision panel shows intent, legal area, risk, the route,
-cited knowledge and the delivery record, and the Developer View shows the timeline, payloads and
-publish attempts.
-
-<p align="center"><img src="assets/demo/demo-desktop-processing.png" alt="Interactive demo: an Instagram-style DM on the left; on the right the architecture graph with a message packet travelling from the queue to the worker" width="100%"></p>
-
-<table>
-  <tr>
-    <td width="50%" valign="top"><img src="assets/demo/demo-desktop-complete.png" alt="Completed run with the reply delivered and the decision panel"><br><b>After delivery.</b> The lit trail is the route this message took; the panel explains the decision.</td>
-    <td width="50%" valign="top"><img src="assets/demo/demo-comment.png" alt="Facebook-style comment under a post with the bot reply nested underneath"><br><b>Comment mode.</b> A public reply under a post, never personal details in public.</td>
-  </tr>
-  <tr>
-    <td valign="top"><img src="assets/demo/demo-developer.png" alt="Developer view with a lane-badged timeline and an inspector showing publish attempts"><br><b>Developer view.</b> Timeline by subsystem, payloads and publish attempts (here: outcome unknown → read-back → resend).</td>
-    <td valign="top"><img src="assets/demo/demo-mobile-complete.png" alt="Mobile layout of the demo" width="60%"><br><b>Mobile.</b> Social mock first, the graph below.</td>
-  </tr>
-</table>
-
-**No real AI, no Meta API, no backend.** Replies and decisions are deterministic stand-ins; business
-facts are fictional demo records and are marked as such in the UI. People are invented.
-Run it locally with `cd apps/demo && npm ci && npm run dev`. Details: [apps/demo/README.md](apps/demo/README.md).
 
 ## Architecture
 

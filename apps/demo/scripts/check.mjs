@@ -26,7 +26,7 @@ const problems = [];
 const requests = new Set();
 
 async function newPage(viewport, opts = {}) {
-  const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, colorScheme: 'dark', reducedMotion: opts.reduced ? 'reduce' : 'no-preference' });
+  const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, colorScheme: 'light', reducedMotion: opts.reduced ? 'reduce' : 'no-preference' });
   const page = await ctx.newPage();
   const tag = `${viewport.width}${opts.reduced ? ' reduced' : ''}`;
   page.on('console', (m) => m.type() === 'error' && problems.push(`console error (${tag}): ${m.text()}`));
@@ -102,8 +102,26 @@ expectEq(await desk.locator('.graph[data-idle]').count(), 1, 'initial screen: gr
   const dev = await desk.locator('[data-device]').boundingBox();
   const g = await desk.locator('.graph-svg').boundingBox();
   expectEq(!!dev && !!g && dev.x + dev.width < g.x + 4, true, '1440: device left of the graph (side by side)');
-  const chips = await desk.locator('.chips-row .sug').first().boundingBox();
-  expectEq(!!chips && chips.y + chips.height <= 900, true, '1440x900: suggestion chips visible on first load');
+  // Platform buttons sit directly under the phone, the six suggestions follow in a 3 x 2 grid.
+  const tabs = await desk.getByRole('tab').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
+  const phone = await desk.locator('[data-device]').boundingBox();
+  expectEq(tabs.length, 4, 'four platform buttons (tabs)');
+  expectEq(!!phone && tabs.every((r) => r.top >= phone.y + phone.height - 1 && r.bottom <= 900), true, '1440x900: platform buttons directly below the phone, inside the first viewport');
+  expectEq(!!phone && Math.abs(phone.height / phone.width - 19.5 / 9) < 0.03, true, `phone aspect ratio about 9:19.5 (${phone && (phone.width / phone.height * 19.5).toFixed(2)}:19.5)`);
+  expectEq(!!phone && phone.width >= 330 && phone.width <= 380, true, `1440x900: phone width 330-380 px (${phone && Math.round(phone.width)})`);
+  expectEq(await desk.locator('.chips-row .sug').count(), 6, 'exactly six suggestions');
+  const grid = await desk.locator('.chips-row .sug').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; }));
+  expectEq(new Set(grid.map((g) => g[0])).size + ' cols x ' + new Set(grid.map((g) => g[1])).size + ' rows', '3 cols x 2 rows', 'suggestions form a 3 x 2 grid');
+  await desk.getByRole('button', { name: 'More examples' }).click();
+  expectEq(await desk.locator('[data-example]').count(), 20, 'More examples lists all 20 scenarios (13 everyday + 7 failure and reliability)');
+  await desk.getByRole('button', { name: 'More examples' }).click();
+  expectEq(await desk.locator('[data-example]').count(), 0, 'More examples collapses again');
+  const bg = await desk.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const [br, bgc, bb] = bg.match(/[0-9]+/g).map(Number);
+  expectEq(br > 225 && bgc > 225 && bb > 225, true, `page background is light (${bg})`);
+  const panel = await desk.evaluate(() => getComputedStyle(document.querySelector('.stage-graph')).backgroundColor);
+  const [pr, pg, pb] = panel.match(/[0-9]+/g).map(Number);
+  expectEq(pr < 40 && pg < 40 && pb < 50, true, `graph panel stays dark (${panel})`);
 }
 {
   const head = await desk.locator('.graph-head').boundingBox();
@@ -120,12 +138,18 @@ expectEq(await desk.locator('.graph[data-idle]').count(), 1, 'initial screen: gr
 }
 await shot(desk, 'demo-desktop-initial.png');
 
-// Every mode renders; comment modes show a post element.
+// Every mode renders; comment modes show a post element. Platform buttons are a keyboard-operable tablist.
 for (const [mode, sel, post] of [['messenger', '[data-mock="messenger"]', false], ['instagram_comment', '[data-mock="instagram_comment"]', true], ['facebook_comment', '[data-mock="facebook_comment"]', true], ['instagram_dm', '[data-mock="instagram_dm"]', false]]) {
   await desk.locator(`[data-mode="${mode}"]`).click();
   expectEq(await desk.locator(sel).count(), 1, `mode ${mode} renders`);
   expectEq(await desk.locator('[data-post]').count(), post ? 1 : 0, `mode ${mode}: post element ${post ? 'present' : 'absent'}`);
 }
+
+await desk.locator('[data-mode="instagram_dm"]').focus();
+await desk.keyboard.press('ArrowRight');
+expectEq(await desk.locator('[data-mode="messenger"]').getAttribute('aria-selected'), 'true', 'platform tabs: ArrowRight selects the next platform');
+await desk.keyboard.press('Home');
+expectEq(await desk.locator('[data-mode="instagram_dm"]').getAttribute('aria-selected'), 'true', 'platform tabs: Home selects the first platform');
 
 // EN and SL texts.
 expectEq(await desk.locator('.hero h2').innerText(), 'Send a message. Watch it move through a production AI system.', 'EN headline');

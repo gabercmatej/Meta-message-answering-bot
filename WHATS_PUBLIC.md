@@ -7,7 +7,8 @@ the repository is checked before publishing see [SECURITY.md](SECURITY.md).
 ## Synthetic
 
 - **The interactive demo** ([`apps/demo/`](apps/demo/)): a browser-only simulation of the pipeline.
-  The account is shown as Pravnik na dlani (own monogram, not the company logo), but all business
+  The account is shown as Pravnik na dlani with the company's own logo (bundled, not hotlinked; the
+  branded post is a demo layout, not a real post), but all business
   facts are fictional demo values and marked as such; people are invented; deterministic matching
   replaces the model; no network access. Live at https://meta-message-answering-bot.vercel.app/.
 - **Everything in [`examples/`](examples/)**: records written for this showcase and shaped after the

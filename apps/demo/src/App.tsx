@@ -3,6 +3,7 @@ import { TipProvider } from './components/common';
 import { DevView } from './components/DevView';
 import { Icon } from './components/Icon';
 import { Comments } from './components/mocks/Comments';
+import { PlatformTabs } from './components/PlatformTabs';
 import { Dm } from './components/mocks/Dm';
 import type { ConvItem, DeliveryStatus } from './components/mocks/types';
 import { Results } from './components/Results';
@@ -170,12 +171,7 @@ export function App() {
   return (
     <TipProvider>
       <div className="app" data-channel={channel}>
-        <TopBar t={t} channel={channel} onChannel={changeChannel} lang={lang} onLang={(l) => !busy && setLang(l)} dev={dev} onDev={setDev} locked={busy || pendingSend} />
-
-        <section className="hero">
-          <h2>{t.heroTitle}</h2>
-          <p>{t.heroSub}</p>
-        </section>
+        <TopBar t={t} lang={lang} onLang={(l) => !busy && setLang(l)} dev={dev} onDev={setDev} />
 
         {busy && (
           <button className="mprog" onClick={jumpToGraph} aria-label={where}>
@@ -186,22 +182,30 @@ export function App() {
         )}
 
         <main className="stage">
+          <section className="hero">
+            <h2>{t.heroTitle}</h2>
+            <p>{t.heroSub}</p>
+          </section>
           <div className="stage-device">
             <div className="device" ref={deviceRef} data-device>
               <div className="bezel">
-                <div className="statusbar" aria-hidden="true">
-                  <span>9:41</span>
-                  <span className="sb-right"><i className="sig" /><i className="wifi" /><i className="batt" /></span>
+                <div className="screen" id="device-screen" role="tabpanel" aria-labelledby={`tab-${channel}`}>
+                  <div className="island" aria-hidden="true" />
+                  <div className="statusbar" aria-hidden="true">
+                    <span>9:41</span>
+                    <span className="sb-right"><i className="sig" /><i className="wifi" /><i className="batt" /></span>
+                  </div>
+                  <div className="screen-swap" key={channel}>
+                    {channel === 'instagram_dm' && <Dm variant="ig" {...mockProps} />}
+                    {channel === 'messenger' && <Dm variant="messenger" {...mockProps} />}
+                    {channel === 'instagram_comment' && <Comments variant="ig" {...mockProps} />}
+                    {channel === 'facebook_comment' && <Comments variant="fb" {...mockProps} />}
+                  </div>
+                  <div className="home-bar" aria-hidden="true" />
                 </div>
-                <div className="screen">
-                  {channel === 'instagram_dm' && <Dm variant="ig" {...mockProps} />}
-                  {channel === 'messenger' && <Dm variant="messenger" {...mockProps} />}
-                  {channel === 'instagram_comment' && <Comments variant="ig" {...mockProps} />}
-                  {channel === 'facebook_comment' && <Comments variant="fb" {...mockProps} />}
-                </div>
-                <div className="home-bar" aria-hidden="true" />
               </div>
             </div>
+            <PlatformTabs t={t} channel={channel} onChannel={changeChannel} locked={busy || pendingSend} />
             <Suggestions t={t} lang={lang} disabled={busy || pendingSend} onSuggest={(text) => typeThenSend(text)} onExample={onExample} />
           </div>
           <div className="stage-graph" id="graph-anchor">
