@@ -22,12 +22,12 @@ them is the porting work; the ingestion, publishing and recovery code does not c
 
 | Available now | Not available here |
 |---|---|
-| [`src-showcase/`](../src-showcase/): annotated excerpts (signature check, durable acceptance, modes, exactly-once dispatch, publishing guards). The excerpts are trimmed and not runnable | PostgreSQL schema and migrations, ingest transaction, queue, decision pipeline, prompts, validators, autonomy policy, dispatcher, reconciler, admin console |
+| Sanitized example records in [`examples/`](../examples/) | PostgreSQL schema and migrations, ingest transaction, queue, decision pipeline, prompts, validators, autonomy policy, dispatcher, reconciler, admin console |
 | [`apps/demo`](../apps/demo/): the full pipeline as a deterministic browser simulation | Any real model or Meta call |
 | Architecture, state machines, decisions and trade-offs in [`docs/`](.) and [`diagrams/`](../diagrams/) | Knowledge base, evaluation datasets, deployment scripts |
 
 Calling this a complete, runnable copy of the production system would be inaccurate.
-[WHATS_PUBLIC.md](../WHATS_PUBLIC.md) lists what is synthetic, excerpted and private. The modules
+[WHATS_PUBLIC.md](../WHATS_PUBLIC.md) lists what is synthetic and what stays private. The modules
 that are generic across organizations (persistence, dispatcher, eligibility, inbox lifecycle, admin
 console without branding) are the ones a port would keep.
 

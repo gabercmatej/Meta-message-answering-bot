@@ -4,8 +4,8 @@ How the system went from *every reply approved by a person* to *ordinary message
 automatically within a minute*, and which parts of the design made that safe enough to do.
 
 Sources: production ADRs 0004 (autonomy-v1), 0005 (owner-approved releases) and 0006 (full
-autonomy), and the project log. Code paths named below are in the private repository; links go to the
-annotated excerpts in [`src-showcase/`](../src-showcase/).
+autonomy), and the project log. Code paths named below are in the private repository; the source is not
+published.
 
 ## 1. Why it started review-first
 
@@ -32,7 +32,7 @@ The architecture already contained LIVE: modes, delayed scheduling, the dispatch
 
 The effective mode is the **least permissive** of the deployment ceiling (`BOT_MODE`), the global
 mode and the per-account mode; a pause always wins
-([`modes.ts`](../src-showcase/modes.ts)). On top of that, LIVE needs the owner's
+(`domain/modes.ts`). On top of that, LIVE needs the owner's
 **LIVE switch** (typed confirmation, audited) and `LIVE_AUTOSEND_ENABLED`. Messages received before
 the switch time are never auto-sent, and nothing floods out after a recovery.
 

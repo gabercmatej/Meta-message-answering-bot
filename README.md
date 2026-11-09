@@ -30,9 +30,9 @@ Built and operated for [Pravnik na dlani](https://pravniknadlani.si/), a Sloveni
 | **Real-model dry run** | 92 of 93 legitimate messages auto-sent (98.9 %), 0 of 11 human-only control cases sent. This is an **automatic-handling rate**, not an accuracy figure ([details](docs/testing-and-evaluation.md#real-model-measurements)) |
 
 > **What this repository is.** A technical case study of a private production system, a
-> runnable [interactive architecture simulation](apps/demo/), and annotated
-> [production excerpts](src-showcase/). It is not the full application. Prompts, the knowledge
-> base, evaluation data and deployment material stay private. What is synthetic, excerpted and
+> runnable [interactive architecture simulation](apps/demo/), and sanitized example records. It
+> contains no production source code and is not the full application. Prompts, the knowledge
+> base, evaluation data and deployment material stay private. What is synthetic and what stays
 > private: [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
 
 ---
@@ -277,9 +277,9 @@ does **not** include, and what a real integration would need: [docs/adapting.md]
 | [`docs/`](docs/) | Architecture, autonomy, challenges, knowledge, Meta, testing, deployment, privacy, evolution |
 | [`diagrams/`](diagrams/) | Mermaid sources for every diagram |
 | [`screenshots/`](screenshots/) | Current UI (November 2026); [`archive-2026-10-01/`](screenshots/archive-2026-10-01/) holds the REVIEW-era set |
-| [`examples/`](examples/) · [`src-showcase/`](src-showcase/) | Sanitized decision/webhook/knowledge records; annotated excerpts from the October showcase |
+| [`examples/`](examples/) | Sanitized, synthetic decision, webhook, draft and knowledge records |
 | [`scripts/privacy-scan.mjs`](scripts/privacy-scan.mjs) | Dependency-free secret/PII/identifier scanner for the tree and Git history |
-| [`WHATS_PUBLIC.md`](WHATS_PUBLIC.md) | What is synthetic, what is excerpted from production, what stays private, screenshot provenance, licence |
+| [`WHATS_PUBLIC.md`](WHATS_PUBLIC.md) | What is synthetic, what stays private, screenshot provenance, licence |
 
 ## Project evolution
 
@@ -339,7 +339,6 @@ recorded as such.
 
 ---
 
-<sub>© 2026 Matej Gaberc. Portfolio case study. No licence is granted for the documentation or for
-the production code excerpts (`src-showcase/`); see [NOTICE.md](NOTICE.md) and [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
+<sub>© 2026 Matej Gaberc. Portfolio case study. No licence is granted for any part of this repository; see [NOTICE.md](NOTICE.md) and [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
 "Pravnik na dlani" is named for context only; this repository is not an official channel of the
 company and nothing here is legal advice.</sub>

@@ -1,7 +1,7 @@
 # Engineering challenges
 
 Each entry: **problem → decision → implementation → trade-off / result**. File paths refer to
-the private repository. Links go to the annotated excerpts in [`src-showcase/`](../src-showcase/).
+the private repository; the source is not published.
 What is public and what is not: [WHATS_PUBLIC.md](../WHATS_PUBLIC.md).
 
 ---
@@ -32,7 +32,7 @@ events; persisting outside a transaction duplicates them.
 normalized events and the queue job in **one PostgreSQL transaction**, and only then return `200`.
 Any persistence failure returns `503`, so Meta retries.
 
-**Implementation.** [`webhook-signature.ts`](../src-showcase/webhook-signature.ts)
+**Implementation.** `meta/webhook-signature.ts`
 (timing-safe HMAC-SHA256), `api/ingest.ts`, and pg-boss jobs inserted in the same transaction.
 
 **Trade-off.** pg-boss in the same database instead of a broker. One fewer moving part and

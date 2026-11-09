@@ -13,13 +13,14 @@ the repository is checked before publishing see [SECURITY.md](SECURITY.md).
   runtime schemas. None is taken from production data.
 - **The people, messages, posts and knowledge entries visible in the screenshots.**
 
-## Excerpted from production
+## Production source code
 
-- **[`src-showcase/`](src-showcase/)**: five annotated excerpts from the private codebase (webhook
-  signature check, durable webhook acceptance, effective-mode resolution, exactly-once dispatch,
-  the PostgreSQL publishing guards). They are trimmed, **not runnable**, and taken from the October
-  2026 snapshot. Behaviour added since (for example the automatic resend of a delivery that Meta
-  verifiably lacks) is described in the documents, not in these excerpts.
+- **Nothing in the current tree.** This repository contains no production source code. The
+  October 2026 version included five annotated excerpts in `src-showcase/` (webhook signature
+  check, durable acceptance, mode resolution, exactly-once dispatch, publishing guards). They were
+  removed from the current tree because the company's authorization to publish them is not
+  documented. They remain in the repository's Git history (commits `4071c10` and `71702cb`),
+  which is not rewritten.
 - **Numbers and dates in the documents** come from the private project log, the decision records
   and a test run on 9 November 2026. Items the log cannot confirm are labelled "owner-reported".
 
@@ -45,8 +46,8 @@ the repository is checked before publishing see [SECURITY.md](SECURITY.md).
 
 ## Licence
 
-**No licence is granted** for any of this material: documentation, diagrams, screenshots, demo or
-excerpts. Reading and evaluating the author's work is the intended use. Details in
+**No licence is granted** for any of this material: documentation, diagrams, screenshots or the
+demo. Reading and evaluating the author's work is the intended use. Details in
 [NOTICE.md](NOTICE.md).
 
 ## What this repository is not

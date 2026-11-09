@@ -29,7 +29,7 @@ and the production hostname in an old README; both were already public and are a
 is not rewritten. Any other history finding blocks a push. Credentials are never accepted as
 historical: if a real secret ever reaches history, it is rotated first and then removed. Exceptions
 require a justified entry in `scripts/privacy-allowlist.json`. Screenshots are reviewed by eye, and the
-DOM text of each captured screen was scanned at capture time. What is synthetic, excerpted or private
+DOM text of each captured screen was scanned at capture time. What is synthetic or private
 is listed in [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
 
 ## Production security (summary)

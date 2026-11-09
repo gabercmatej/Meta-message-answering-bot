@@ -129,7 +129,7 @@ blank directory using an allow-list approach:
 - **Fresh, independent history.** The repository was initialized empty. No commits, branches or
   objects from the private repository were copied, so private history cannot leak through Git.
 - **Allow-list, not deny-list.** Each file was written specifically for the showcase. Nothing was
-  bulk-copied. Production source code (apart from the five trimmed excerpts in `src-showcase/`),
+  bulk-copied. Production source code,
   deployment material, certificates, logs, environment files and database dumps are absent.
 - **No private knowledge or evaluation data.** The legal knowledge base, prompts, evaluation cases
   and harvested historical conversations stay private. Examples here are synthetic and

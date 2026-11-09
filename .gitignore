@@ -17,7 +17,6 @@ logs/
 .local/
 *.zip
 *.sql
-!src-showcase/*.sql
 *.dump
 *.tmp
 
