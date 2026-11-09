@@ -24,6 +24,7 @@ flowchart TD
     TRANSPORT -->|yes| EFF
     EFF --> PAUSE
     PAUSE -->|yes| BLOCK
+    PAUSE -->|"no: the dispatcher still rechecks at send time"| OK["Send permits possible"]
 ```
 
 ## Same pipeline, different dispatch
@@ -41,8 +42,9 @@ flowchart TD
     OFFM -->|"REPLAY or Test Lab"| N1["Simulated publisher: never sends"]
     OFFM -->|"SHADOW"| N2["Stored as evidence<br/>never sendable: code, CHECK, trigger"]
     OFFM -->|"REVIEW"| N3["needs_review<br/>sent only after a human action"]
-    OFFM -->|"LIVE: built, disabled"| N4["Low-risk allowlist scheduled<br/>everything else needs review"]
+    OFFM -->|"LIVE (r5, since 3 Nov 2026)"| N4["Eligible replies scheduled (60 s)<br/>approved fallback when the draft is unusable<br/>hard-risk items need a person"]
 ```
 
-On 1 October 2026 production runs REVIEW with `LIVE_AUTOSEND_ENABLED=false`. LIVE is refused
-unless `BOT_MODE=LIVE`.
+Production runs LIVE since 3 November 2026 (owner-reported). LIVE also needs the owner's LIVE
+switch and a LIVE authorization bound to the release checksum and the running code's fingerprints.
+On 1 October 2026 production ran REVIEW with `LIVE_AUTOSEND_ENABLED=false`.

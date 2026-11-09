@@ -1,53 +1,46 @@
-# Message flow
+# B. Incoming message lifecycle
 
-From webhook bytes to one human-approved reply. Details:
-[../docs/message-lifecycle.md](../docs/message-lifecycle.md).
+From the webhook bytes to a reply confirmed by Meta. Every arrow that crosses a process or a
+network boundary is durable on one side before it happens.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant M as Meta
-    participant A as API process
-    participant D as PostgreSQL
+    participant A as API (webhook)
+    participant P as PostgreSQL
     participant W as Worker
-    participant P as Decision pipeline
-    participant H as Human reviewer
-    participant X as Publishing module
+    participant C as Claude
+    participant D as Dispatcher
 
-    M->>A: POST webhook with X-Hub-Signature-256
-    A->>A: HMAC-SHA256 over original bytes
-    alt signature missing or invalid
-        A-->>M: 401, body not stored, hourly counter only
-    else signature valid
-        A->>A: normalize: FB and IG adapters, string IDs, dedupe key
-        A->>D: BEGIN: receipt, events ON CONFLICT dedupe, one job per new event, COMMIT
-        alt commit failed
-            A-->>M: 503 so Meta retries
-        else committed
-            A-->>M: 200 EVENT_RECEIVED
-        end
-    end
-
-    D->>W: job delivered by pg-boss
-    W->>W: mode check at processing time
-    W->>M: GET source comment or message, thread, post, profile
-    W->>D: upsert comment, reply item with mode_at_creation
-    W->>P: immutable context snapshot, active release, pinned knowledge
-    P-->>W: action, reason codes, source refs, AI draft
-    W->>D: decision, ai_usage rows, item needs_review
-
-    H->>A: Approve and Send, or Edit and Send, with rowVersion
-    A->>D: item approved, AI draft kept, final text stored, audit event
-
-    X->>D: lock item, local prechecks
-    X->>M: GET source still exists, not already answered
-    X->>D: lock again, recheck, state sending, attempt with exact text, COMMIT
-    X->>M: exactly one POST
-    alt confirmed
-        X->>D: sent with platform id
-    else timeout, 5xx or no id
-        X->>D: outcome_unknown, never resent
-        X->>M: later GET read-back reconciliation
-        X->>D: reconciled_sent, or back to a human
+    M->>A: POST /webhooks/meta (X-Hub-Signature-256)
+    A->>A: verify HMAC over the original bytes (timing-safe)
+    A->>P: BEGIN · receipt + normalized events (dedupe key) + queue job · COMMIT
+    A-->>M: 200 only after COMMIT (503 on any persistence failure)
+    P-->>W: job
+    W->>M: GET source (still exists? edited? who wrote it?)
+    W->>W: context snapshot: thread / conversation, post caption, pseudonymous author
+    W->>W: deterministic inbound signals (risk, injection, minors, deadlines …)
+    W->>C: understanding (intent, legal area, risk) — redacted text only
+    W->>W: retrieval over knowledge pinned by the active release
+    W->>C: writer (approved knowledge + plan) → JSON
+    W->>W: validators (grounding, prices, links, formal address, legal verdict …)
+    W->>C: model check
+    W->>W: autonomy policy → reply · clarify · approved fallback · human
+    W->>P: reply_item = scheduled (scheduled_for = now + delay) — or needs_review
+    Note over P: 60 s later (or "Send now")
+    D->>P: lock item · recheck mode, pause, switch, release, takeover, duplicates
+    D->>M: GET source again (deleted? already answered elsewhere?)
+    D->>P: persist exact text + attempt = pending, item = sending
+    D->>M: POST reply (one write)
+    alt Meta returns an id
+        D->>P: attempt succeeded · item sent (platform id stored)
+    else timeout / 5xx / crash after the write
+        D->>P: attempt outcome_unknown
+        D->>M: GET read-back (own-reply matching)
+        D->>P: reconciled_sent — or reconciled_absent → bounded resend (auto replies only)
     end
 ```
+
+Key property: **"sent" is a confirmed Meta write, never an assumption.** A reply that was
+generated, scheduled or attempted is not reported as sent.

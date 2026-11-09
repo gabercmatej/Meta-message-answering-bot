@@ -1,55 +1,29 @@
-# Knowledge flow
+# C. AI reasoning and knowledge retrieval
 
-From a draft knowledge entry to a grounded reply. Details:
-[../docs/knowledge-system.md](../docs/knowledge-system.md).
-
-## Lifecycle
+Three model calls, each with a JSON schema, surrounded by deterministic code. The model never
+chooses what is allowed to be sent; it proposes, and code verifies against approved knowledge.
 
 ```mermaid
 flowchart TD
-    K1["Knowledge version: draft"]
-    K2["Human review in console"]
-    K3["Knowledge version: approved, immutable"]
-    R1["Behavior release draft<br/>immutable, checksummed"]
-    R2["Replay on that exact checksum"]
-    G{"Gates pass, fresh-model evidence,<br/>all pinned knowledge approved?"}
-    R3["Release approved with evidence and human note"]
-    ACT["Activation: audited scope pointer<br/>global or account"]
-    STOP["Not approvable: fix and create a new release"]
-
-    K1 --> K2 --> K3
-    K3 -->|"pinned by entry and version"| R1
-    R1 --> R2 --> G
-    G -->|yes| R3 --> ACT
-    G -->|no| STOP
+    IN["Inbound text + context snapshot<br/>(untrusted, redacted)"] --> SIG["Deterministic inbound signals<br/>risk words, injection, minors, deadlines,<br/>personal data, harm-as-legal-topic"]
+    SIG --> U["① Understanding call<br/>intent (14) · legal area (17 labels, incl. 'not legal')<br/>risk level + flags · needs lawyer · language"]
+    U --> CORR{"Model reading<br/>corroborated by text?"}
+    CORR -- "e.g. urgency not in text" --> FIX["drop / downgrade<br/>MODEL_URGENCY_NOT_IN_TEXT"]
+    CORR --> PLAN
+    FIX --> PLAN["Route request (code)<br/>tier A service · B orientation · C human<br/>plan: reply / clarify / handoff"]
+    PLAN --> RET["Retrieval over release-pinned knowledge<br/>approved · in validity window · in scope<br/>query expansion + concepts (e.g. price_objection)"]
+    RET --> GEN["② Writer call<br/>approved knowledge + plan + style (vikanje)<br/>→ text + cited knowledge ids"]
+    GEN --> VAL["Deterministic validators<br/>numbers / prices / URLs / phones must exist in cited entries<br/>LEGAL_VERDICT_IN_REPLY · FALSE_HANDOFF_CLAIM<br/>INFORMAL_ADDRESS · EMERGENCY_NUMBER_NOT_NEEDED"]
+    VAL -- "wording finding" --> REP["One bounded repair<br/>re-validated"]
+    REP --> VAL
+    VAL --> CHK["③ Model check<br/>(independent validator model)"]
+    CHK --> DEC{"Autonomy policy<br/>+ fallbackBlockers"}
+    DEC -- "valid, grounded, safe" --> AUTO["Automatic reply"]
+    DEC -- "draft unusable,<br/>no hard signal" --> FB["Approved fallback text<br/>AUTONOMY_SAFE_FALLBACK"]
+    DEC -- "threat · self-harm · distress<br/>minor writer · injection · privacy<br/>refund dispute · critical risk" --> HUM["Person (needs_review)"]
+    U -. "timeout / provider error /<br/>invalid JSON" .-> AIF["AI_UNAVAILABLE_FALLBACK<br/>(unless a hard signal)"]
+    GEN -. "invalid output" .-> AIF
 ```
 
-## At decision time
-
-```mermaid
-flowchart TD
-    MSG["Redacted message, retrieval query,<br/>legal-area label"]
-    PINS["Only knowledge pinned by the active release"]
-    ELIG{"Approved, valid now,<br/>in scope?"}
-    EXCL["Reported as KNOWLEDGE_EXCLUDED with reason"]
-    SCORE["Keyword scoring<br/>figures weighted highest"]
-    TOP["Top entries above minScore, at most maxEntries"]
-    CONTRA{"Contradiction on a shared factKey?"}
-    GEN["Generation sees only retrieved entries and must cite them"]
-    VAL{"Citations known and every figure,<br/>contact, URL and offer grounded?"}
-    OK["Grounded reply"]
-    REV["Review with reason codes"]
-
-    MSG --> SCORE
-    PINS --> ELIG
-    ELIG -->|no| EXCL
-    ELIG -->|yes| SCORE
-    SCORE --> TOP --> CONTRA
-    CONTRA -->|"yes and used"| REV
-    CONTRA -->|no| GEN --> VAL
-    VAL -->|yes| OK
-    VAL -->|no| REV
-```
-
-General legal-area guidance (`general_info`) can be retrieved for context, but it can never on its
-own ground a product, price or contact reply.
+What is **not** happening: no fine-tuning, no custom-trained model, no hidden chain-of-thought
+stored. The system records concise reason codes and knowledge ids for every decision.
