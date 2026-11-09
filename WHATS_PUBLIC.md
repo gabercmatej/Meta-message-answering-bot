@@ -26,7 +26,8 @@ the repository is checked before publishing see [SECURITY.md](SECURITY.md).
 ## Private
 
 - The full application source and its Git history.
-- Prompts, the knowledge base, approved reply texts and release manifests.
+- Prompts, the knowledge base, approved reply texts and release manifests (one exception: the r5
+  approved fallback text is visible in screenshots 07 and 10, because every customer receives it).
 - Evaluation datasets, real-model run outputs and historical conversations.
 - Deployment scripts, hostnames, account and page identifiers, credentials and customer data.
 
@@ -37,6 +38,8 @@ the repository is checked before publishing see [SECURITY.md](SECURITY.md).
   autonomy policy, validators, scheduler and dispatcher are the real code. The model is a scripted
   stand-in (no paid calls) and the Meta transport is a fake, so nothing left the machine. Status
   panels use a production-shaped configuration with dummy credentials.
+  Bot replies show the company's public phone number and opening hours; all other people,
+  messages and posts are invented.
 - **[`screenshots/archive-2026-10-01/`](screenshots/archive-2026-10-01/)** is the set from the first,
   October showcase of the REVIEW-era console, kept as history and labelled as such.
 

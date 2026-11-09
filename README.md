@@ -8,7 +8,7 @@ scheduled automatic publishing and delivery confirmation, with a full operator c
 
 Built and operated for [Pravnik na dlani](https://pravniknadlani.si/), a Slovenian legal-services company.
 
-`TypeScript` · `Node.js 20+` · `PostgreSQL` · `pg-boss` · `Fastify` · `React` · `Anthropic Claude` · `Meta Graph API` · `Vitest`
+`TypeScript` · `Node.js 22` · `PostgreSQL` · `pg-boss` · `Fastify` · `React` · `Anthropic Claude` · `Meta Graph API` · `Vitest`
 
 [**Interactive demo**](apps/demo/) · [What is public](WHATS_PUBLIC.md) · [Architecture](docs/architecture.md) · [Autonomous LIVE mode](docs/autonomous-live-mode.md) · [Engineering challenges](docs/engineering-challenges.md) · [Quick start](#quick-start) · [Screenshots](#the-product)
 
@@ -40,9 +40,7 @@ Built and operated for [Pravnik na dlani](https://pravniknadlani.si/), a Sloveni
 ## Not a chatbot wrapper
 
 A naive integration is `message → LLM → send`. Here, the model is one untrusted component inside
-a pipeline where **code decides what may be sent, when, and whether it actually arrived**:
-
-
+a pipeline where **code decides what may be sent, when, and whether it actually arrived**.
 
 Four states that most systems blur are kept apart: a reply **generated**, **scheduled**,
 **attempted**, and **confirmed by Meta**. "Sent" means Meta returned an id, or a read-back found
@@ -51,16 +49,16 @@ the reply. The full stage list is [below](#the-pipeline-end-to-end).
 ## From review-first to high autonomy
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Oct["October 2026 · REVIEW"]
         direction LR
         a1["Inbound"] --> a2["AI draft"] --> a3["Person reviews<br/>every reply"] --> a4["Send"]
     end
     subgraph Nov["November 2026 · LIVE (r5)"]
         direction LR
-        b1["Inbound"] --> b2["Context"] --> b3["Classify"] --> b4["Knowledge"] --> b5["AI decision"] --> b6["Validate"] --> b7["Schedule 60 s"] --> b8["Publish"] --> b9["Confirm delivery"]
+        b1["Inbound +<br/>context"] --> b3["Classify +<br/>knowledge"] --> b5["AI decision"] --> b6["Validate"] --> b7["Schedule<br/>60 s"] --> b8["Publish +<br/>confirm"]
         b6 -. "hard risk" .-> h["Person"]
-        b5 -. "AI unusable" .-> f["Approved fallback"]
+        b5 -. "AI unusable" .-> f["Approved<br/>fallback"]
     end
     Oct ==> Nov
 ```
@@ -112,12 +110,12 @@ The current admin console. Synthetic data, real UI ([provenance](#screenshot-pro
     <td width="50%" valign="top"><img src="screenshots/06-dm-burst-merged.png" alt="Two rapid DMs merged into one reply"><br><b>DM bursts.</b> "Živjo" followed by the real question within the delay window becomes one decision and one reply ("Združeno z novejšim sporočilom").</td>
   </tr>
   <tr>
-    <td valign="top"><img src="screenshots/07-ai-failure-approved-fallback.png" alt="Approved fallback text sent after the model call timed out"><br><b>Model unavailable → approved fallback.</b> An injected model timeout (the one deliberate failure in this set): the release's approved fallback text was sent instead of leaving the person unanswered.</td>
-    <td valign="top"><img src="screenshots/10-test-lab-invalid-output-fallback.png" alt="Test Lab showing AI_TIMEOUT and AI_UNAVAILABLE_FALLBACK"><br><b>The same failure in Test Lab.</b> Reason codes <code>AI_TIMEOUT</code> and <code>AI_UNAVAILABLE_FALLBACK</code>; the decision is a referral, not silence.</td>
+    <td valign="top"><img src="screenshots/07-ai-failure-approved-fallback.png" alt="Approved fallback text sent after the model call timed out"><br><b>Model unavailable → approved fallback.</b> An injected model timeout (the one deliberate failure in this set): the release's approved fallback text was sent instead of leaving the person unanswered. The console still labels it "AI predlog".</td>
+    <td valign="top"><img src="screenshots/10-test-lab-timeout-fallback.png" alt="Test Lab showing AI_TIMEOUT and AI_UNAVAILABLE_FALLBACK"><br><b>The same failure in Test Lab</b>, here as a Facebook comment. Reason codes <code>AI_TIMEOUT</code> and <code>AI_UNAVAILABLE_FALLBACK</code>; the decision is a referral, not silence.</td>
   </tr>
   <tr>
-    <td valign="top"><img src="screenshots/09-test-lab-decision.png" alt="Test Lab decision with reason codes"><br><b>Test Lab.</b> A holiday-allowance question through the production pipeline, never published: "would reply", employment law, low risk, the knowledge used, reason codes and the active release. Provider shown honestly as <code>fake</code>.</td>
-    <td valign="top"><img src="screenshots/11-versioned-knowledge.png" alt="Knowledge entries filtered to synthetic examples, with approval details"><br><b>Versioned knowledge.</b> Typed entries with approval, validity window and source; expired entries are excluded from retrieval automatically. Filtered to synthetic entries.</td>
+    <td valign="top"><img src="screenshots/09-test-lab-decision.png" alt="Test Lab decision with reason codes"><br><b>Test Lab.</b> A holiday-allowance question through the production pipeline, never published: "would reply", employment law, low risk, the knowledge used, reason codes and the active release. The "Zakaj" (why) field lists every knowledge source attached to the decision, not only the ones the reply quotes. Provider shown honestly as <code>fake</code>.</td>
+    <td valign="top"><img src="screenshots/11-versioned-knowledge.png" alt="Knowledge entries filtered to synthetic examples, with approval details"><br><b>Versioned knowledge.</b> Typed entries with approval, validity window and source; expired entries are excluded from retrieval automatically. Filtered to synthetic entries; the counters are for the whole local corpus.</td>
   </tr>
   <tr>
     <td valign="top"><img src="screenshots/13-auto-reply-delay-settings.png" alt="Automatic reply delay setting 1 min"><br><b>Configurable delay.</b> 0 to 60 minutes, one setting for all surfaces, plus a daily automatic-send limit.</td>
@@ -265,7 +263,7 @@ cd Meta-message-answering-bot
 
 # 1. Interactive demo (no keys, no backend)
 cd apps/demo && npm ci && npm run dev          # http://localhost:5173 (no hosted instance yet)
-npm test && npm run build                      # 74 simulator tests, static build
+npm test && npm run build                      # 78 tests, static build
 ```
 
 Node.js 20+. No database, network access or credentials. What the public build
@@ -316,7 +314,10 @@ PostgreSQL. The pipeline, autonomy policy, validators, scheduler and dispatcher 
 code. The Meta adapter and publish transport are fakes (nothing left the machine), the model is a
 scripted stand-in (no paid calls), and every person, message and post is invented. Status panels
 use a production-shaped configuration with dummy credentials, so they read "graph" while sending
-goes to the fake. The knowledge view is filtered to synthetic entries. Exactly one case (07 and 10) is a
+goes to the fake. The knowledge view is filtered to synthetic entries. Bot replies contain the company's public
+phone number and opening hours, and 07 and 10 show the r5 approved fallback text verbatim; both
+are what every customer receives anyway. The other reply texts were written for the capture.
+Exactly one case (07 and 10) is a
 deliberately injected model timeout, to show the fallback path. A few status strings in the
 Slovenian UI are still English in this build, and two settings texts predate LIVE mode; they are
 shown as captured, not edited. Captures are 1.5× scale; the hero is a 2×2 composition of the same
@@ -339,6 +340,6 @@ recorded as such.
 ---
 
 <sub>© 2026 Matej Gaberc. Portfolio case study. No licence is granted for the documentation or for
-the production code extract; see [NOTICE.md](NOTICE.md) and [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
+the production code excerpts (`src-showcase/`); see [NOTICE.md](NOTICE.md) and [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
 "Pravnik na dlani" is named for context only; this repository is not an official channel of the
 company and nothing here is legal advice.</sub>

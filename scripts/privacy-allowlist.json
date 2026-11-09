@@ -1,51 +1,9 @@
 [
   {
     "rule": "long_numeric_id",
-    "path": "packages/engine/test/",
-    "match": "0{5,}",
-    "reason": "Synthetic Meta ids and epoch timestamps in fixtures and tests are deliberately round numbers (five or more consecutive zeros); see packages/engine/test/fixtures/meta/README.md. Non-round ids are not covered and stay findings."
-  },
-  {
-    "rule": "long_numeric_id",
-    "path": "packages/engine/test/webhook-payload-resilience.test.ts",
-    "match": "^12345678901234567890$",
-    "reason": "Sequential digits used to test an oversized numeric id; not an identifier."
-  },
-  {
-    "rule": "long_numeric_id",
     "path": "examples/sanitized-webhook.json",
     "match": "^1790842500000$",
     "reason": "Millisecond epoch timestamp (1 Oct 2026 08:15 UTC) of a synthetic example event, not an account or user id."
-  },
-  {
-    "rule": "meta_token",
-    "path": "packages/engine/test/graph-http.test.ts",
-    "match": "^EAABBBcccDDDeeeFFFggg111222333444555$",
-    "reason": "Obviously fake token-shaped string used to prove the redactor removes Meta tokens."
-  },
-  {
-    "rule": "assigned_secret",
-    "path": "packages/engine/test/graph-http.test.ts",
-    "match": "EAABBBcccDDDeeeFFFggg111222333444555",
-    "reason": "Same fake token constant as above, assigned to TOKEN in the test."
-  },
-  {
-    "rule": "assigned_secret",
-    "path": "packages/engine/test/",
-    "match": "\\[redacted\\]",
-    "reason": "Expected output of the redactor: the value is the literal [redacted] marker, not a secret."
-  },
-  {
-    "rule": "assigned_secret",
-    "path": "packages/engine/test/",
-    "match": "^[A-Z_]+ = '(?:test-app-secret-0123456789abcdef|verify-token-for-tests-123|synthetic-app-secret-for-tests)$",
-    "reason": "Self-describing test-only HMAC secrets and verify tokens used to sign synthetic fixtures."
-  },
-  {
-    "rule": "phone_si_local",
-    "path": "packages/engine/test/webhook-signature.test.ts",
-    "match": "^01-000-0000$",
-    "reason": "Synthetic all-zero phone number in a multi-byte signature test; replaced the company number in the public copy."
   },
   {
     "rule": "email",

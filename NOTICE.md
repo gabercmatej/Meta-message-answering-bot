@@ -11,9 +11,9 @@ decisions and the way the work was approached.
 - **No licence is granted.** Publishing this material does not give anyone permission to use,
   copy, modify or redistribute it, in whole or in part. No open-source licence applies unless a
   file says otherwise.
-- **Production code (`src-showcase/`).** These files are taken from the private production repository. Their publication is subject to authorization by the
-  company the system was built for; see [WHATS_PUBLIC.md](WHATS_PUBLIC.md). They are
-  shown for review and evaluation of the author's work, not licensed for reuse.
+- **Production code (`src-showcase/`).** These excerpts come from the private production repository and were first published in the
+  October 2026 showcase. They are shown for review and evaluation of the author's work, not
+  licensed for reuse; see [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
 - **Client name.** "Pravnik na dlani" is named only to give the case study context. This
   repository is not an official channel of that service, and nothing here is legal advice.
 - **Synthetic and redacted material.** Product screenshots were captured from the real admin

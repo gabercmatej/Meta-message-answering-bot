@@ -50,7 +50,7 @@ Diagrams: [../diagrams/mode-flow.md](../diagrams/mode-flow.md), [../diagrams/rev
 
 ## The decision pipeline
 
-`runDecisionPipeline()` (`src/pipeline/decide.ts`, `pipeline-v3`). It returns
+`runDecisionPipeline()` (`src/pipeline/decide.ts`, `pipeline-v4`). It returns
 `reply | clarify | handoff | review | skip | error`, a concise list of **reason codes**, source refs
 and a per-stage trace with latency. It never stores chain-of-thought.
 

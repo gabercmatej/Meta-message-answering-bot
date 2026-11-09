@@ -68,7 +68,7 @@
   <path class="e" d="M1040 396 V408" marker-end="url(#a)"/>
   <path class="e" d="M836 198 H800 V499 H780" marker-end="url(#a)"/>
   <text class="l" x="806" y="524">AI calls</text>
-  <path class="e" d="M836 284 H764" marker-end="url(#a)"/>
+  <path class="e" d="M764 284 H836" marker-end="url(#a)"/>
   <text class="l" x="768" y="277">pins</text>
   <path class="e" d="M836 360 H764" marker-end="url(#a)"/>
   <text class="l" x="768" y="353">state</text>

@@ -11,7 +11,9 @@ import { chromium } from 'playwright';
 import { preview } from 'vite';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const outDir = path.resolve(here, '../../../assets/demo');
+// apps/demo/scripts -> repo root is three levels up
+const repoRoot = path.resolve(here, '..', '..', '..');
+const outDir = path.join(repoRoot, 'assets', 'demo');
 await mkdir(outDir, { recursive: true });
 
 const server = await preview({ root: path.resolve(here, '..'), preview: { port: 4173, strictPort: true, host: '127.0.0.1' }, logLevel: 'warn' });
@@ -46,6 +48,29 @@ function expectEq(actual, expected, what) {
   else console.log(`ok  ${what} → ${actual}`);
 }
 
+// Regression: a new run must not inherit the previous run's finished state. After run A completes,
+// start run B and sample the page until B's final state appears: no delivered bot reply may be in
+// the chat while the pipeline is still running.
+async function noEarlyDelivery(page, label, what) {
+  await page.getByRole('button', { name: label, exact: true }).click();
+  const pill = page.locator('.pipeline .panel-head .state-pill');
+  // delivered = a bot bubble in the chat that is not the ghosted pending (scheduled/publishing) one
+  const delivered = () => page.locator('.msg.bot:not(.pending)').count();
+  let samples = 0;
+  let early = 0;
+  const t0 = Date.now();
+  while (Date.now() - t0 < 30_000) {
+    const [running, bots] = await Promise.all([pill.count().then((n) => n === 0), delivered()]);
+    if (!running) break;
+    samples += 1;
+    if (bots > 0) early += 1;
+    await page.waitForTimeout(40);
+  }
+  expectEq(samples >= 5, true, `${what}: observed the run in progress (${samples} samples)`);
+  expectEq(early, 0, `${what}: no delivered bot reply while the run is in progress`);
+  expectEq(await delivered(), 1, `${what}: exactly one bot reply once the run finished`);
+}
+
 // ---------------------------------------------------------------- desktop
 const desk = await newPage({ width: 1440, height: 900 });
 {
@@ -59,6 +84,7 @@ console.log('saved demo-pipeline.png (countdown in progress)');
 await pipelineDone(desk);
 expectEq(await finalState(desk), 'sent', 'default scenario (employment termination, IG DM)');
 expectEq(await desk.locator('.msg.bot .meta').last().innerText(), 'Sent automatically · delivery confirmed', 'bot reply shown in chat');
+await noEarlyDelivery(desk, 'Transient Meta failure', 'desktop second run');
 
 expectEq(await scenario(desk, 'Duplicate webhook'), 'sent', 'duplicate webhook');
 expectEq(await desk.locator('.msg.bot').count(), 1, 'duplicate webhook → exactly one bot reply in chat');
@@ -100,6 +126,7 @@ const mob = await newPage({ width: 390, height: 844 });
 await pipelineDone(mob);
 const overflow = await mob.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 expectEq(overflow <= 0, true, 'mobile 390 px: no horizontal page scroll');
+await noEarlyDelivery(mob, 'Duplicate webhook', 'mobile second run');
 await mob.getByRole('button', { name: 'Transient Meta failure', exact: true }).click();
 await mob.locator('.mprog-text', { hasText: /^Stage \d+\/12/ }).waitFor({ timeout: 10_000 });
 await mob.evaluate(() => window.scrollTo(0, 360));

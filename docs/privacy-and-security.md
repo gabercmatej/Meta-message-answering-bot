@@ -92,7 +92,7 @@ planned but not finished, it says so.
 
 - **Reviewer context is short-lived.** Sender display names carried on webhook events are cleared
   once the event reaches a final state. Sender profiles that no longer link to any comment or message
-  are deleted. Signed avatar and thumbnail URLs are cleared after they expire. This cleanup runs with
+  are deleted. Signed avatar and thumbnail URLs are cleared after 30 days (they expire on Meta's side). This cleanup runs with
   each worker cycle.
 - **Deleted source content is respected.** When a comment or message is deleted or unsent, it is
   not answered, and stale backlog is expired instead of being answered late in a burst.

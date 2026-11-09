@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RunTrace } from './sim/types';
+import { INITIAL_PLAYBACK, finish, isFinished, nextStage, viewFor, withCountdown, type PlaybackState } from './playbackState';
 
 /**
  * Plays a precomputed trace back on an accelerated clock. Stage durations are display pacing for
@@ -30,62 +31,58 @@ function stageDisplayMs(simMs: number, skipped: boolean): number {
 }
 
 export function usePlayback(run: RunTrace | null, onDone: (run: RunTrace) => void): Playback {
-  const [stage, setStage] = useState(0);
-  const [countdown, setCountdown] = useState<number | null>(null);
+  const [state, setState] = useState<PlaybackState>(INITIAL_PLAYBACK);
   const timer = useRef<number | null>(null);
   const doneFor = useRef<string | null>(null);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
+
+  // Derived per run: a new run reads as stage 0 even before the state has been replaced.
+  const { stage, countdown } = viewFor(state, run?.id ?? null);
+  const finished = !!run && isFinished(state, run.id, run.stages.length);
 
   const clear = () => {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = null;
   };
 
-  useEffect(() => {
-    clear();
-    setStage(0);
-    setCountdown(null);
-    return clear;
-  }, [run?.id]);
+  useEffect(() => clear, []);
 
   useEffect(() => {
     if (!run) return;
-    if (stage >= run.stages.length) {
-      setCountdown(null);
+    if (finished) {
       if (doneFor.current !== run.id) {
         doneFor.current = run.id;
         onDoneRef.current(run);
       }
       return;
     }
+    const id = run.id;
     const s = run.stages[stage]!;
     if (s.id === 'schedule' && s.status === 'ok') {
       const total = Math.round(s.simMs / 1000);
       const start = countdown ?? total;
-      if (countdown === null) setCountdown(total);
+      if (countdown === null) setState((p) => withCountdown(p, id, total));
       if (start <= 0) {
-        timer.current = window.setTimeout(() => {
-          setCountdown(null);
-          setStage((i) => i + 1);
-        }, 200);
+        timer.current = window.setTimeout(() => setState((p) => nextStage(p, id)), 200);
         return clear;
       }
       const tick = reducedMotion() ? 1000 / 60 : 1000 / DELAY_ACCELERATION;
-      timer.current = window.setTimeout(() => setCountdown(start - 1), tick);
+      timer.current = window.setTimeout(() => setState((p) => withCountdown(p, id, start - 1)), tick);
       return clear;
     }
-    timer.current = window.setTimeout(() => setStage((i) => i + 1), stageDisplayMs(s.simMs, s.status === 'skip'));
+    timer.current = window.setTimeout(() => setState((p) => nextStage(p, id)), stageDisplayMs(s.simMs, s.status === 'skip'));
     return clear;
-  }, [run, stage, countdown]);
+  }, [run, stage, countdown, finished]);
 
-  const sendNow = useCallback(() => setCountdown(0), []);
+  const sendNow = useCallback(() => {
+    if (run) setState((p) => withCountdown(p, run.id, 0));
+  }, [run]);
   const skipAll = useCallback(() => {
     if (!run) return;
     clear();
-    setCountdown(null);
-    setStage(run.stages.length);
+    setState(finish(run.id, run.stages.length));
   }, [run]);
 
-  return { stage, countdown, done: !!run && stage >= run.stages.length, sendNow, skipAll };
+  return { stage, countdown: finished ? null : countdown, done: finished, sendNow, skipAll };
 }
