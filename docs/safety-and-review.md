@@ -1,9 +1,16 @@
 # Safety model and human review
 
-Status as of **1 October 2026**: production runs **REVIEW**. Every outgoing reply is approved by a
-human, and only on surfaces that passed a controlled write verification. LIVE autosend exists in
-code, is refused unless the deployment ceiling is `BOT_MODE=LIVE`, and is **disabled**
-(`LIVE_AUTOSEND_ENABLED=false`). Enabling it is a separate, future phase.
+> **Updated 9 November 2026.** Production runs **LIVE with automatic replies** (release r5, since
+> 3 November 2026). This page describes the invariants and the publishing safeguards, which guard
+> automatic and human sends alike, and the review actions, which now serve the items that stay with
+> a person. Where the October (REVIEW-era, releases r2/r3) rules differ from the current ones
+> (autonomy-v1 tiers, approved fallback, delivery recovery), the text says so; the autonomy design
+> itself is in [autonomous-live-mode.md](autonomous-live-mode.md).
+
+**History.** On 1 October 2026 production ran **REVIEW**: every outgoing reply was approved by a
+human, only on surfaces that passed a controlled write verification, with LIVE autosend built but
+disabled. That gate was relaxed in steps through October and November, never by removing a
+runtime check.
 
 Diagrams: [../diagrams/mode-flow.md](../diagrams/mode-flow.md), [../diagrams/review-flow.md](../diagrams/review-flow.md).
 
@@ -27,7 +34,7 @@ Diagrams: [../diagrams/mode-flow.md](../diagrams/mode-flow.md), [../diagrams/rev
 | `OFF` | not run | none | impossible |
 | `SHADOW` | full pipeline on real traffic | created with the AI draft as evidence | **impossible**: code, DB CHECK `reply_items_shadow_never_sends`, and a `publish_attempts` trigger |
 | `REVIEW` | full pipeline | `needs_review` | only after a human Approve & Send / Edit & Send, per verified surface |
-| `LIVE` | full pipeline | eligible low-risk items `scheduled` with a delay; all others `needs_review` | built, **disabled**; refused below `BOT_MODE=LIVE` |
+| `LIVE` | full pipeline | items that pass `autoSendEligibility()` are `scheduled` with a delay (60 s in production); all others `needs_review` | automatic after the delay and the dispatcher recheck; refused below `BOT_MODE=LIVE`. **Production since 3 Nov 2026** |
 
 - Effective mode = least permissive of `BOT_MODE` (deployment ceiling), global mode and account
   mode (`effectiveMode()` in `src/domain/modes.ts`).
@@ -43,7 +50,7 @@ Diagrams: [../diagrams/mode-flow.md](../diagrams/mode-flow.md), [../diagrams/rev
 
 ## The decision pipeline
 
-`runDecisionPipeline()` (`src/pipeline/decide.ts`, `pipeline-v3`). It returns
+`runDecisionPipeline()` (`src/pipeline/decide.ts`, `pipeline-v4`). It returns
 `reply | clarify | handoff | review | skip | error`, a concise list of **reason codes**, source refs
 and a per-stage trace with latency. It never stores chain-of-thought.
 
@@ -63,17 +70,29 @@ and a per-stage trace with latency. It never stores chain-of-thought.
 ### Hard invariants in code
 
 - **Allowed rule actions per intent** (`ALLOWED_RULE_ACTIONS` in `src/domain/categories.ts`). For
-  example `threat_sensitive_distress` can only be `review`; `individual_legal_situation` can only be
-  `review`, `fixed_reply` or `handoff`. No release can enable an AI-written answer to a personal
-  legal situation.
-- **No AI reply categories**: complaint, account / payment / refund, individual legal situation,
-  general legal topic, threat / distress, spam, self / handled, unsupported media.
+  example `threat_sensitive_distress` can only be `review`, and `spam_abuse` only `skip` or
+  `review`. A release can only narrow what a category allows, never widen it.
+- **Baseline for releases without autonomy (r2/r3, October).** No AI-written reply for complaint,
+  account / payment / refund, individual legal situation, general legal topic, threat / distress,
+  spam, self / handled or unsupported media: legal topics could only end as an approved handoff
+  text or a human-reviewed draft.
+- **Tiers for autonomy-v1 releases (r4/r5, ADR 0004).** A release opts in; the tiers themselves are
+  code. **A** service answers (product, price, contact, thanks, grounded "other", clarification),
+  **B** bounded legal orientation (how the company helps, which documents matter; no merits,
+  deadlines or outcome promises; it must name an approved contact route and is refused when it
+  states a legal verdict), **C** the approved handoff or fallback text, **human** for everything
+  else. Threat / distress, spam, self / handled and unsupported media are never answered by AI
+  text, and a complaint gets at most the approved acknowledgement through the fallback level. Tax
+  and foreigners law stay with a person by an owner decision.
 - **Grounding**: product, pricing and contact / booking replies must cite at least one approved
   business fact. General legal-area guidance alone can never ground them. A pricing reply needs a
   `price` or `offer` fact, and figures in the question that no cited fact covers force review.
 - **Risk flags**: `SELF_HARM`, `THREAT` and `DISTRESS` always mean a human decides. `VIOLENCE`,
   `MINORS` and `CRIMINAL_EXPOSURE` forbid an AI-written answer. A model cannot report a flag with a
-  lower risk level than code assigns to it.
+  lower risk level than code assigns to it. One narrow, deterministic exception exists in
+  autonomy releases: harassment or violence *vocabulary* inside a legal-help request, with no acute
+  danger, threat, self-harm, distress or minor (`HARM_TOPIC_LEGAL_REQUEST`, ADR 0006), is treated
+  as a legal topic and goes through the ordinary tiers with all their validators.
 - **Handoff text** comes only from the approved release, never from the model.
 - **Public comments** never get a clarifying question that asks for personal or case details. A
   named identifier or health detail on a public comment forces review, even when no value was
@@ -96,8 +115,13 @@ generation actions and model-check issues are closed enums. Untrusted data (mess
 caption, conversation, draft under review) is fenced in a single delimited block in the user turn
 and is redacted first. Invalid output gets **at most one repair attempt**; after that the decision
 is `review / AI_INVALID_OUTPUT`. Refusals are never retried. Timeouts and unavailability are
-technical `error`s. There is **no fallback model**: each stage uses the model the release pins, and
-a mismatch is an error (`MODEL_NOT_CONFIGURED`, `AI_MODEL_MISMATCH`), never a substitution.
+technical `error`s. In **r5** a failed understanding, writer or check call is answered with the
+release's approved generic text (`AI_UNAVAILABLE_FALLBACK`), unless a deterministic hard signal
+(threat, violence outside a legal-help request, distress, self-harm, minor, injection, refund
+dispute, privacy request, refused phone route) forbids even that; then a person handles it. There
+is **no fallback model**: each stage uses the model the release pins, and a mismatch is an error
+(`MODEL_NOT_CONFIGURED`, `AI_MODEL_MISMATCH`), never a substitution. The fallback is approved
+text, not another model.
 
 ## Human review
 
@@ -137,23 +161,41 @@ Server-side actions (`src/inbox/lifecycle.ts`, `REPLY_ACTIONS`):
   [message-lifecycle.md](message-lifecycle.md#5-dispatch-publishing-module).
 - **Exact text and attempt state persisted before the write.** A recorded attempt's text, target and
   endpoint are immutable (trigger).
-- **`outcome_unknown` is never resent**: at most one open attempt per item (unique partial index),
-  reconciliation by read-back, otherwise handed back to a human.
+- **`outcome_unknown` is never resent blindly**: at most one open attempt per item (unique partial
+  index) and reconciliation by read-back first. Since r5 (ADR 0006) an **automatic** reply that
+  Meta verifiably does not show after the reconciliation reads (`reconciled_absent`) is sent again,
+  at most 3 attempts in total, with a fresh Meta read before each write that treats a late-visible
+  earlier attempt as delivered, and every pre-send check repeated. A **person's** reply is never
+  resent automatically. An unresolved outcome, a permanent rejection or exhausted throttling
+  retries log a structured `DELIVERY_NEEDS_OPERATOR` alert.
 - **Kill switch**: a pause blocks new send permits at once (DB trigger plus dispatcher). A request
   already sent cannot be recalled; in-flight state is shown honestly as `sending` or "check needed".
 - **Daily send limit** from publishing settings.
 
-## LIVE autosend: built, disabled
+## LIVE autosend: eligibility and recheck
 
-`autoSendEligibility()` (`src/publishing/eligibility.ts`) would only ever narrow. It requires LIVE
-mode, the autosend environment flag, the settings flag and a release allowlist (surface, action,
-intent). It then excludes, as hard invariants: any risk other than low, any risk flag,
-never-automatic intents (complaint, payment / refund, personal legal situation, distress, spam,
-unclear, unsupported media, self / handled), needs-lawyer without handoff, ungrounded replies,
-knowledge conflicts, any validator failure, AI text without a passing model check, historical or
-taken-over items, and trace codes indicating personal data, injection, deadlines or low confidence.
-A scheduled autosend is re-checked at dispatch (release unchanged, item younger than 24 h). None of
-this runs in production today.
+`autoSendEligibility()` (`src/publishing/eligibility.ts`) only ever narrows. It requires LIVE mode,
+the autosend environment flag, the settings flag, a release allowlist (surface, action, intent)
+and a LIVE authorization bound to the release checksum and to the behavior and dispatch code
+fingerprints ([autonomous-live-mode.md](autonomous-live-mode.md#5-owner-approved-releases)). It then
+excludes, as hard invariants:
+
+- **Risk above the tier's ceiling**: low for service answers, medium for bounded orientation, high
+  (never critical) for the approved handoff. Risk flags a tier does not explicitly tolerate also block.
+- **Never-automatic intents outside their tier**: complaint, refund / payment, legal intents,
+  unclear and the others in the code's never-auto set may be automatic only in the narrow form their
+  tier allows (for example a clarifying question or the approved handoff); threat / distress, spam,
+  self / handled and unsupported media never are.
+- Ungrounded replies, knowledge conflicts, any validator failure, AI text without a passing model
+  check, an informal address in a formal release, a claim that "a person reviews this", historical,
+  stale or taken-over items, and messages received before the LIVE switch.
+- For the **fallback** level, the only content blockers are the hard reasons in `fallbackBlockers`
+  (threats, violence, distress, self-harm, minors, injection, privacy requests, refund disputes,
+  critical risk, unsupported language, a refused phone route).
+
+Every scheduled automatic send is re-checked by the dispatcher immediately before the write (pause,
+mode, scope, release and authorization, source existence, takeover, duplicates, messaging window,
+knowledge validity, daily limit). None of these checks reads an evaluation result.
 
 ## Privacy
 

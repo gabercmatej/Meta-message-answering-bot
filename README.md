@@ -1,389 +1,362 @@
-# Meta Message Answering Bot
+<div align="center">
 
-A production human-in-the-loop AI system that handles Facebook and Instagram comments and direct
-messages for a Slovenian legal advisory service. Signed Meta webhooks are stored durably and turned
-into reply drafts. The system classifies each message by intent, legal area and risk, retrieves
-versioned, approved legal and service knowledge, and then either writes a constrained draft with
-Anthropic's Claude or uses an approved fixed text. Deterministic code validates the result and
-decides what may happen next. A person approves every reply, and a single verified publishing
-module sends it exactly once.
+# Autonomous Facebook & Instagram reply system for a legal-services company: Claude, LIVE in production
 
-Built for [Pravnik na dlani](https://pravniknadlani.si/), a Slovenian legal advisory service that
-offers consultations with lawyers, legal opinions and document preparation. Conversations can touch
-on employment, family, inheritance and other legal matters, so retrieval quality, uncertainty
-handling, human review and controlled publishing were core requirements from the start.
+**An end-to-end decision and delivery system for Facebook and Instagram: contextual
+classification, versioned knowledge, constrained AI drafting, deterministic validation,
+scheduled automatic publishing and delivery confirmation, with a full operator console.**
+
+Built and operated for [Pravnik na dlani](https://pravniknadlani.si/), a Slovenian legal-services company.
+
+`TypeScript` · `Node.js 22` · `PostgreSQL` · `pg-boss` · `Fastify` · `React` · `Anthropic Claude` · `Meta Graph API` · `Vitest`
+
+[**▶ Live interactive demo**](https://meta-message-answering-bot.vercel.app/) · [What is public](WHATS_PUBLIC.md) · [Architecture](docs/architecture.md) · [Autonomous LIVE mode](docs/autonomous-live-mode.md) · [Engineering challenges](docs/engineering-challenges.md) · [Quick start](#quick-start) · [Screenshots](#the-product)
+
+**[Try the live demo →](https://meta-message-answering-bot.vercel.app/)** Send a message in an Instagram- or Facebook-style mock and watch it travel through the architecture. Browser-only simulation: no real AI, no Meta API, no backend.
+
+</div>
 
 <p align="center">
-  <img src="assets/pnd-bot-hero.png" alt="PND admin UI: overview dashboard, unified Facebook and Instagram inbox with an AI draft awaiting human review, approved knowledge base and Test Lab pipeline trace" width="100%">
+  <img src="assets/hero-live-console.png" alt="The PND admin console in LIVE mode: the overview with replies sent automatically, a scheduled reply with its countdown, an automatic Messenger reply with bounded legal orientation, and the Test Lab decision view" width="100%">
 </p>
-<p align="center"><sub>Real admin UI from an isolated instance with synthetic data. No real users or messages are shown.</sub></p>
+<p align="center"><sub>The real admin console (Slovenian UI), run locally on synthetic people and messages, with the real pipeline and dispatcher, a scripted model and a fake Meta transport. <a href="#screenshot-provenance">How these were captured</a>.</sub></p>
 
-**At a glance:** Messenger · Instagram DM · Facebook and Instagram comments &nbsp;|&nbsp;
-OFF / SHADOW / REVIEW / LIVE modes &nbsp;|&nbsp; deployed in REVIEW &nbsp;|&nbsp; 733 automated tests
+| | |
+|---|---|
+| **Status** | In production. Release `pnd-v1-anthropic-r5`, **LIVE with automatic replies** on all four surfaces (owner-reported, November 2026) |
+| **Surfaces** | Facebook comments · Messenger · Instagram comments · Instagram Direct |
+| **Autonomy** | Ordinary messages answered automatically after a configurable delay (60 s in production); hard-risk messages always go to a person |
+| **Tests** | **3,401 automated tests for the messaging bot** at the production commit: 2,808 unit + 593 integration against real PostgreSQL, all passing (re-run 9 Nov 2026). The whole repository, which also holds a separate Content Bot, runs 4,871 ([evidence](docs/testing-and-evaluation.md)) |
+| **Real-model dry run** | 92 of 93 legitimate messages auto-sent (98.9 %), 0 of 11 human-only control cases sent. This is an **automatic-handling rate**, not an accuracy figure ([details](docs/testing-and-evaluation.md#real-model-measurements)) |
 
-> This repository is a portfolio case study of a private production system. It contains
-> documentation, diagrams, sanitized examples, representative source excerpts and screenshots, not
-> the application source. See [Privacy](#privacy) and [NOTICE.md](NOTICE.md).
-
----
-
-## Product walkthrough
-
-<table>
-  <tr>
-    <td width="50%" valign="top"><img src="screenshots/01-overview.png" alt="Overview dashboard"><br><b>1. Overview.</b> Bot mode (Review), channel and AI status, and the day's comments, DMs, items needing review and replies sent.</td>
-    <td width="50%" valign="top"><img src="screenshots/02-messages.png" alt="Unified Facebook and Instagram inbox with AI draft"><br><b>2. One inbox for Facebook and Instagram.</b> Comments and DMs in one queue. Each AI draft shows its action, risk, legal area and reason, and nothing is sent until a person decides.</td>
-  </tr>
-  <tr>
-    <td valign="top"><img src="screenshots/04-draft-vs-final.png" alt="AI draft compared with the reply that was sent"><br><b>3. AI draft vs. what was sent.</b> The original draft and the human-edited final reply are both kept, with who sent it.</td>
-    <td valign="top"><img src="screenshots/03-edit-and-send.png" alt="Edit and Send with activity trail"><br><b>4. Edit &amp; Send and the activity trail.</b> The reviewer edits a copy; the AI draft stays unchanged and every step is audited.</td>
-  </tr>
-  <tr>
-    <td valign="top"><img src="screenshots/07-knowledge.png" alt="Approved knowledge entries"><br><b>5. Approved knowledge only.</b> Typed entries with validity, approval and source. Anything not here stays unknown and goes to a person.</td>
-    <td valign="top"><img src="screenshots/08-test-lab-pipeline.png" alt="Test Lab stage-by-stage pipeline trace"><br><b>6. Test Lab pipeline trace.</b> The same decision pipeline as real traffic, every stage visible, never published. This run uses the deterministic stand-in provider.</td>
-  </tr>
-</table>
-
-Safety and readiness controls (modes, high-risk holds, write verification, Meta readiness) are shown
-further down in [Operating modes](#operating-modes), [Safety and publishing](#safety-and-publishing)
-and [Status](#status).
+> **What this repository is.** A technical case study of a private production system, a
+> runnable [interactive architecture simulation](apps/demo/), and sanitized example records. It
+> contains no production source code and is not the full application. Prompts, the knowledge
+> base, evaluation data and deployment material stay private. What is synthetic and what stays
+> private: [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
 
 ---
 
-## From Meta to production
+## Not a chatbot wrapper
 
-The system is built and deployed against the real Meta platform, not a mock:
+A naive integration is `message → LLM → send`. Here, the model is one untrusted component inside
+a pipeline where **code decides what may be sent, when, and whether it actually arrived**.
 
-```text
-Meta platform          Facebook Page + Instagram professional account (Messenger, IG Direct, comments)
-      │  signed webhooks (HMAC-SHA256)
-      ▼
-PND webhook / API      meta.pravniknadlani.si: verify signature, store, acknowledge
-      │  one PostgreSQL transaction
-      ▼
-Worker + PostgreSQL    durable queue, Graph API re-reads, context snapshot
-      │
-      ▼
-Legal knowledge + AI   classification, release-pinned retrieval, constrained Claude draft, validation
-      │
-      ▼
-Human review           Messages workspace: approve, edit, hold, no reply
-      │
-      ▼
-Verified publisher     full pre-send recheck, exact text persisted, one write
-      │
-      ▼
-Meta Graph API         reply on Messenger / Instagram DM (verified surfaces only)
-```
+Four states that most systems blur are kept apart: a reply **generated**, **scheduled**,
+**attempted**, and **confirmed by Meta**. "Sent" means Meta returned an id, or a read-back found
+the reply. The full stage list is [below](#the-pipeline-end-to-end).
 
-<table>
-  <tr>
-    <td width="50%" valign="top"><img src="screenshots/13-meta-developer-app.png" alt="Meta Developer dashboard showing the PravnikNaDlani app in Development mode, App ID redacted"><br><b>Meta Developer app.</b> The Meta app behind the Messenger and Instagram integration, still in Development mode while Advanced Access and App Review were being completed. App ID removed.</td>
-    <td width="50%" valign="top"><img src="screenshots/14-production-node-app.png" alt="Hosting panel showing the Node.js 22 application for meta.pravniknadlani.si, server path redacted"><br><b>Production Node.js application.</b> The Node.js 22 app serving meta.pravniknadlani.si. The panel's "Application mode" only sets NODE_ENV, which the app does not read; the bot itself runs in REVIEW. Server account path removed.</td>
-  </tr>
-</table>
-
-A real external platform, a real backend, a real review UI and a real deployment. The Meta app is
-registered with Business Verification complete. The Node.js API and worker run on managed hosting
-with PostgreSQL, and real Messenger and Instagram DM conversations have gone through the full loop.
-
-## Why this is more than a chatbot
-
-A naive integration is three steps:
-
-```text
-user message → LLM → send
-```
-
-This system treats the model as one untrusted component inside a controlled pipeline:
-
-```text
-Meta event
- → signature validation over the original bytes
- → durable ingestion (receipt, events and queue job in one transaction, then acknowledge)
- → normalization (Facebook and Instagram adapters, string IDs, deduplication)
- → context (source re-read from Meta, thread or conversation, post caption, pseudonymous author)
- → classification (intent, legal area, risk level and flags)
- → knowledge retrieval (only approved entries pinned by the active release)
- → constrained AI draft, or an approved fixed text
- → validation (deterministic validators, optional model check)
- → code-controlled decision (reply, clarify, hand off, review, skip)
- → human review
- → publishing eligibility (mode, pause, verified surface, source still exists, not already answered)
- → one verified Graph API write
-```
-
-The model can propose. Only code decides, and only a person approves.
-
-## Operating modes
-
-| Mode | Inbound processing | AI draft | Human review | Sending |
-|---|---|---|---|---|
-| **OFF** | Webhooks are verified and stored; the worker records `MODE_OFF` and stops | No | No | No |
-| **SHADOW** | Full pipeline on real traffic | Yes, stored as evidence | Visible, read-only | **Never.** SHADOW items can never become sendable |
-| **REVIEW** | Full pipeline | Yes | Every reply | Only after a human action, on a write-verified surface |
-| **LIVE** | Full pipeline | Yes | Everything except a narrow low-risk allowlist | Delayed autosend for eligible items only. Architecture exists, **not enabled** |
-
-- The effective mode is the least permissive of the deployment ceiling, the global mode and the
-  per-account mode. A global pause blocks new sends in every mode.
-- Startup refuses unsafe combinations, such as REVIEW without a publishing transport or autosend
-  outside LIVE.
-- **Current deployment: REVIEW.** Automated LIVE sending is **not enabled**.
-- **Meta app "Live/Published" is a separate concept from bot LIVE.** Publishing the Meta app only lets
-  Meta deliver events from people without a role on the app. The bot stays in REVIEW and every reply
-  still needs a person.
-
-![Bot status Off / Shadow / Review / Live with per-channel modes](screenshots/10-mode-controls.png)
-
-*Mode controls: the server caps the bot at Review, and per-channel modes can never exceed the global
-mode. Live is not available in this version.*
-
-More: [docs/safety-and-review.md](docs/safety-and-review.md#modes-and-the-dispatch-boundary).
-
-## Legal knowledge
-
-The model is not expected to "just know" Slovenian law. What the bot may say comes from a structured,
-versioned knowledge base, and code checks that it did.
-
-- **Classification before retrieval.** Each message is first classified into one of 17 Slovenian
-  legal areas (or "not a legal question"), one of 14 intents and a risk level. The legal area shapes
-  retrieval and routing.
-- **Structured, versioned, immutable.** Knowledge entries are typed (FAQ, service fact, price, offer,
-  contact route, link, policy boundary, legal-area guidance) and have a scope, a validity window and
-  a source. Editing creates a new version, and stored versions cannot change.
-- **Business facts are deterministic.** Prices, links and contact routes are stored as structured
-  values. Validators reject any figure, URL, contact or offer term in a draft that the cited entries
-  do not support.
-- **Only relevant knowledge reaches the model.** Retrieval runs over the entries the active release
-  pins, filters out unapproved, expired and out-of-scope entries, and passes only the top matches.
-- **Releases are evaluated before activation.** A behavior release pins knowledge versions, prompts,
-  models and rules, is replayed against evaluation datasets, and can be approved only on passing
-  gates for that exact checksum.
-- **Uncertainty forces human handling.** Missing, conflicting or expired facts, personal legal
-  situations and elevated risk send the item to a person instead of producing an answer.
-- **It supports legal staff; it does not replace a lawyer.** The bot does not give individualized
-  advice, calculate deadlines or promise outcomes. Legal questions get an approved referral to a
-  lawyer.
-
-A sanitized, conceptual example of how a general legal question is handled:
-
-```text
-User:       "Kolikšen je odpovedni rok pri redni odpovedi?"
-            ("What is the notice period for an ordinary termination?")
-Legal area: employment law
-Intent:     general legal topic
-Risk:       low, no risk flags; needs a lawyer
-Retrieval:  pinned, approved entries for employment law and lawyer referral
-Routing:    code chooses a hand-off, so no AI answer to the legal question is generated
-Mode:       REVIEW
-Result:     approved lawyer-referral draft, waiting for a person to approve, edit or hold
-```
-
-The bot does not answer the legal question itself. The full synthetic decision record is in
-[examples/sanitized-decision.json](examples/sanitized-decision.json).
-
-More: [docs/knowledge-system.md](docs/knowledge-system.md).
-
-## Safety and publishing
-
-- **The final send decision is code-controlled.** Model output is schema-validated and still treated
-  as untrusted. Routing, risk handling and send eligibility are decided in code.
-- **The model cannot publish.** AI code has no Meta token, no tools and no database access. Only the
-  publishing module can write to Meta, and a lint rule enforces that boundary.
-- **Each Meta write surface needs controlled write verification.** A surface can send only after one
-  owner-confirmed, audited test write has succeeded on it. A hand-set "verified" is refused.
-- **SHADOW items can never become sendable.** The API, the dispatcher and the database (a CHECK
-  constraint and triggers) all refuse.
-- **Duplicate sends are prevented.** Business-level deduplication, row-version checks on every
-  review action and at most one open publish attempt per item.
-- **Outbound text is frozen before the Graph write.** The exact text and the attempt are committed
-  first, and the dispatcher rechecks pause, mode, source existence and prior replies right before
-  the write.
-- **Uncertain outcomes are never retried blindly.** A timeout or crash after the write becomes
-  `outcome_unknown` and is reconciled by reading Meta back.
-- **Self-echoes are ignored.** Meta's echoes of the business's own messages and the business's own
-  comments never produce a reply.
-- **The AI draft and the human final text are stored separately**, so every edit is visible.
-- **Every review action is audited** with the actor and before and after state.
-- **High-risk messages go to a person.** Distress, threats and self-harm always need a human, and
-  the bot writes no reply text for them.
-
-### REVIEW message lifecycle
+## From review-first to high autonomy
 
 ```mermaid
-flowchart TD
-    IN["New message or comment"] --> PIPE["Decision pipeline<br/>draft and reason codes"]
-    PIPE --> NR["Needs review"]
-    PIPE --> SK["Skipped<br/>no reply needed"]
-    NR -->|"Hold, No reply, Mark handled"| DONE["Held, skipped or handled"]
-    NR -->|"Approve & Send or Edit & Send"| AP["Approved<br/>AI draft kept, final text stored"]
-    AP --> CHK{"Pre-send recheck"}
-    CHK -->|"blocked"| NR
-    CHK -->|"passes"| SND["Sending<br/>exact text persisted"]
-    SND -->|"Meta returned an id"| SENT["Sent"]
-    SND -->|"timeout or crash"| UNK["Outcome unknown"]
-    UNK -->|"read-back finds the reply"| SENT
-    UNK -->|"not found"| NR
+flowchart TB
+    subgraph Oct["October 2026 · REVIEW"]
+        direction LR
+        a1["Inbound"] --> a2["AI draft"] --> a3["Person reviews<br/>every reply"] --> a4["Send"]
+    end
+    subgraph Nov["November 2026 · LIVE (r5)"]
+        direction LR
+        b1["Inbound +<br/>context"] --> b3["Classify +<br/>knowledge"] --> b5["AI decision"] --> b6["Validate"] --> b7["Schedule<br/>60 s"] --> b8["Publish +<br/>confirm"]
+        b6 -. "hard risk" .-> h["Person"]
+        b5 -. "AI unusable" .-> f["Approved<br/>fallback"]
+    end
+    Oct ==> Nov
 ```
 
-Full state machine: [diagrams/review-flow.md](diagrams/review-flow.md).
+The system started **review-first** on purpose: legal-adjacent conversations, a new Meta
+integration and no measured quality. Autonomy was earned in steps (r3 → r4 → r5):
+per-surface write verification, a one-click LIVE switch, tiered autonomy (service answers,
+bounded legal orientation, human), an approved-fallback level, owner-approved releases bound
+to code fingerprints, and recovery for unknown delivery outcomes. Threats, self-harm,
+distress, minors, prompt injection, privacy and refund disputes **still go to a person**.
 
-![A distress/threat message with no AI reply text, put on hold](screenshots/05-high-risk-held.png)
+→ [docs/autonomous-live-mode.md](docs/autonomous-live-mode.md)
 
-*A critical-risk message: the bot writes no reply text, explains why, and the reviewer has put it on
-Hold.*
+### The pipeline, end to end
 
-![Rules that always require a person, and the fail-closed sending readiness check](screenshots/11-review-rules-and-readiness.png)
+```text
+Meta webhook ─► signature over raw bytes ─► durable ingest (1 txn, then 200) ─► normalize 4 surfaces
+  ─► context (Graph re-read, thread, post) ─► deterministic risk signals ─► ① understanding (Claude)
+  ─► retrieval over release-pinned approved knowledge ─► ② writer (Claude, JSON) ─► validators
+  ─► ③ model check ─► autonomy policy ─► schedule (60 s) ─► dispatcher recheck ─► write-ahead
+  ─► one Graph POST ─► confirmed id │ outcome_unknown ─► read-back ─► reconcile / bounded resend
+```
 
-*Rules that always require a person cannot be switched off by settings or releases. The readiness
-check is fail-closed: in this local showcase it reports Blocking because it runs on fakes.*
+## The product
 
-More: [docs/safety-and-review.md](docs/safety-and-review.md) and
-[docs/message-lifecycle.md](docs/message-lifecycle.md).
+The current admin console. Synthetic data, real UI ([provenance](#screenshot-provenance)).
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="screenshots/04-auto-reply-then-manual-message.png" alt="Messenger thread: an automatic reply labelled 'AI predlog · samodejno poslano', then a staff message"><br><b>Automatic reply, then a person.</b> The bot answered a question about written legal opinions from approved knowledge ("AI predlog · samodejno poslano"); a staff member then followed up in the same thread ("Sporočilo ekipe"). Both go through one dispatcher.</td>
+    <td width="50%" valign="top"><img src="screenshots/03-scheduled-countdown.png" alt="Scheduled automatic reply with a 0:50 countdown and Send now / Cancel"><br><b>Scheduled, not yet sent.</b> A bounded-orientation reply to an unpaid-salary question waits out the 60 s delay with a live countdown. Staff can send it now or cancel; every pre-send check still runs.</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="screenshots/02-unified-inbox-scheduled.png" alt="Unified inbox across Facebook and Instagram, most items 'Čaka na pošiljanje'"><br><b>One inbox, four surfaces.</b> Facebook and Instagram comments and DMs in one list. Here seven replies wait for their send time and one threat is held for a person.</td>
+    <td valign="top"><img src="screenshots/05-facebook-comment-post-context.png" alt="Facebook comment thread with post caption context and an automatic public reply"><br><b>Comments with post context.</b> A public Facebook comment, the post it belongs to, and the bot's automatic public reply.</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="screenshots/08-high-risk-held-for-person.png" alt="A threatening Instagram DM held for review with the reason"><br><b>Hard risk stays human.</b> A threat is never auto-sent. The UI shows why: "Samodejno ni poslano – varnostno zadržanje vsebine".</td>
+    <td valign="top"><img src="screenshots/12-releases-owner-approval-rollback.png" alt="Releases page with r5 active, rollback to r4, re-authorize for current code"><br><b>Releases.</b> r5 active, one-click rollback to r4, the approval and activation history, and "authorize for the current code" after a deploy changes the fingerprints. The baseline release is a synthetic seed.</td>
+  </tr>
+</table>
+
+<details>
+<summary><b>More screens</b>: overview, DM bursts, AI-failure fallback, Test Lab, knowledge, delay settings, Meta readiness</summary>
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="screenshots/01-overview-live.png" alt="Overview dashboard"><br><b>Overview.</b> Bot status, channel connections, items waiting, replies sent today, urgent items.</td>
+    <td width="50%" valign="top"><img src="screenshots/06-dm-burst-merged.png" alt="Two rapid DMs merged into one reply"><br><b>DM bursts.</b> "Živjo" followed by the real question within the delay window becomes one decision and one reply ("Združeno z novejšim sporočilom").</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="screenshots/07-ai-failure-approved-fallback.png" alt="Approved fallback text sent after the model call timed out"><br><b>Model unavailable → approved fallback.</b> An injected model timeout (the one deliberate failure in this set): the release's approved fallback text was sent instead of leaving the person unanswered. The console still labels it "AI predlog".</td>
+    <td valign="top"><img src="screenshots/10-test-lab-timeout-fallback.png" alt="Test Lab showing AI_TIMEOUT and AI_UNAVAILABLE_FALLBACK"><br><b>The same failure in Test Lab</b>, here as a Facebook comment. Reason codes <code>AI_TIMEOUT</code> and <code>AI_UNAVAILABLE_FALLBACK</code>; the decision is a referral, not silence.</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="screenshots/09-test-lab-decision.png" alt="Test Lab decision with reason codes"><br><b>Test Lab.</b> A holiday-allowance question through the production pipeline, never published: "would reply", employment law, low risk, the knowledge used, reason codes and the active release. The "Zakaj" (why) field lists every knowledge source attached to the decision, not only the ones the reply quotes. Provider shown honestly as <code>fake</code>.</td>
+    <td valign="top"><img src="screenshots/11-versioned-knowledge.png" alt="Knowledge entries filtered to synthetic examples, with approval details"><br><b>Versioned knowledge.</b> Typed entries with approval, validity window and source; expired entries are excluded from retrieval automatically. Filtered to synthetic entries; the counters are for the whole local corpus.</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="screenshots/13-auto-reply-delay-settings.png" alt="Automatic reply delay setting 1 min"><br><b>Configurable delay.</b> 0 to 60 minutes, one setting for all surfaces, plus a daily automatic-send limit.</td>
+    <td valign="top"><img src="screenshots/14-meta-readiness.png" alt="Meta readiness and channel connections"><br><b>Meta readiness.</b> Channels, inbound delivery, write verification per surface, and app-access status, tracked separately from bot modes. App-access items read "Neznano" (unknown) in the local environment; production values are owner-recorded.</td>
+  </tr>
+</table>
+</details>
+
+## Interactive demo
+
+**[Open the live demo](https://meta-message-answering-bot.vercel.app/)** · source in [`apps/demo`](apps/demo/)
+
+Send a message from an Instagram-style or Messenger-style chat, or comment under an Instagram- or
+Facebook-style post (English or Slovenian), and watch the packet travel through the real topology:
+webhook and signature check, normalization and dedupe, the durable queue, context, classification,
+knowledge retrieval, the (simulated) model, the policy gate, validation, the scheduler, the only
+publisher, and delivery reconciliation. Each route follows the simulator's trace, so different
+messages take different paths: a human-only message stops at review, an AI outage takes the
+approved-fallback bypass, a duplicate webhook dies at the normalizer, a Meta 429 loops through retry,
+and an uncertain write is read back before anything is resent. The reply appears only after
+simulated delivery is confirmed; then the decision panel shows intent, legal area, risk, the route,
+cited knowledge and the delivery record, and the Developer View shows the timeline, payloads and
+publish attempts.
+
+<p align="center"><img src="assets/demo/demo-desktop-processing.png" alt="Interactive demo: an Instagram-style DM on the left; on the right the architecture graph with a message packet travelling from the queue to the worker" width="100%"></p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/demo/demo-desktop-complete.png" alt="Completed run with the reply delivered and the decision panel"><br><b>After delivery.</b> The lit trail is the route this message took; the panel explains the decision.</td>
+    <td width="50%" valign="top"><img src="assets/demo/demo-comment.png" alt="Facebook-style comment under a post with the bot reply nested underneath"><br><b>Comment mode.</b> A public reply under a post, never personal details in public.</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="assets/demo/demo-developer.png" alt="Developer view with a lane-badged timeline and an inspector showing publish attempts"><br><b>Developer view.</b> Timeline by subsystem, payloads and publish attempts (here: outcome unknown → read-back → resend).</td>
+    <td valign="top"><img src="assets/demo/demo-mobile-complete.png" alt="Mobile layout of the demo" width="60%"><br><b>Mobile.</b> Social mock first, the graph below.</td>
+  </tr>
+</table>
+
+**No real AI, no Meta API, no backend.** Replies and decisions are deterministic stand-ins; business
+facts are fictional demo records and are marked as such in the UI. People are invented.
+Run it locally with `cd apps/demo && npm ci && npm run dev`. Details: [apps/demo/README.md](apps/demo/README.md).
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    Meta["Meta platform<br/>Facebook and Instagram"] -->|"signed webhooks"| API["API process<br/>Fastify, TypeScript"]
-    API -->|"one transaction"| DB[("PostgreSQL<br/>state, audit, pg-boss queue")]
-    DB --> Worker["Worker process<br/>decision pipeline"]
-    Worker -->|"redacted prompt, JSON out"| AI["Anthropic Claude"]
-    Worker -->|"GET only"| Meta
-    Admin["React admin console<br/>Messages, Knowledge, Test Lab"] -->|"session, CSRF, roles"| API
-    DB --> Pub["Publishing module<br/>the only writer"]
-    Pub -->|"one POST, verified surfaces"| Meta
+<p align="center"><img src="assets/architecture.svg" alt="System architecture: Meta webhooks into the API, PostgreSQL as system of record and queue, worker with context, pipeline, policy, scheduler and dispatcher, Claude as a tool-less subsystem, React admin console" width="100%"></p>
+
+- **One modular TypeScript codebase**, two processes (API, worker), PostgreSQL as both system of
+  record and queue (pg-boss). There are no microservices: the hard problems are transactional, not scaling.
+- **One decision pipeline** for live traffic, admin preview, Test Lab and historical replay. Only
+  the sink differs; replay and SHADOW are structurally unable to publish.
+- **The model has no authority.** AI code holds no Meta token, tools or DB handle; a lint rule
+  forbids importing a write transport outside `src/publishing`.
+- **Invariants live in code and in the database**: CHECK constraints and triggers refuse SHADOW
+  sends, sends while paused, edits to frozen attempt text, and a second open attempt per reply.
+
+Diagrams: [system](diagrams/architecture.md) · [message lifecycle](diagrams/message-flow.md) ·
+[AI & knowledge](diagrams/knowledge-flow.md) · [publishing & recovery](diagrams/publishing-delivery.md) ·
+[releases](diagrams/release-lifecycle.md) · [state machine](diagrams/state-machine.md)
+
+## Engineering challenges I solved
+
+| Problem | Decision | Result |
+|---|---|---|
+| Four Meta surfaces with different payloads, ids and echo rules | Separate FB/IG adapters, zod-validated normalization to one event shape, string ids, quarantine for unknown shapes | `webhook-payload.ts`, with tests on real webhook shapes |
+| Webhooks retried, duplicated, out of order | HMAC over raw bytes; receipt + events + job in **one transaction** before `200`; event dedupe keys; unique reply intents | Duplicate deliveries never produce a second reply |
+| A timeout after a write may mean it succeeded | Exact text and attempt persisted **before** the POST; unknown → read-back; resend only when Meta verifiably lacks it (auto replies, max 3) | No blind resends; "sent" only on a confirmed id |
+| Meta lists your own reply back differently (NFD, zero-width chars, `{post}_{comment}` ids) | `own-reply-match.ts`: NFC, invisible-char stripping, both id forms, time window | Fixed a real "nothing was sent" false failure on all four surfaces |
+| Auto replies and staff replies racing | Dispatcher three-phase lock with `row_version`; queued manual message cancels a pending auto reply (`SUPERSEDED_BY_MANUAL_MESSAGE`) | A person and the bot never answer the same message twice |
+| Three DMs in ten seconds | Burst coalescing inside the delay window; review is per item, never a conversation lock | One reply per burst |
+| New code, stale authorization | LIVE authorization bound to release checksum **and** behavior/dispatch code fingerprints | Every deploy that changes behavior stops auto-send until a free, audited owner re-authorization |
+| A model that over-reads risk ("nasilje" in a workplace-harassment question) | Deterministic corroboration (`HARM_TOPIC_LEGAL_REQUEST`, `MODEL_URGENCY_NOT_IN_TEXT`); acute-danger words still block | Real legal questions answered; real threats still held |
+| Provider timeouts leave people unanswered | `AI_UNAVAILABLE_FALLBACK`: approved generic text unless a hard signal forbids it | Outages degrade to an honest contact route, not silence |
+| Formal Slovenian address ("vikanje") | Release style pin + `INFORMAL_ADDRESS` final check + normalization; approval refuses informal approved texts | Every automatic reply in r5 is formal |
+
+→ The full write-up, with code references and trade-offs: [docs/engineering-challenges.md](docs/engineering-challenges.md)
+
+## Knowledge and AI orchestration
+
+The model is **not fine-tuned**. Domain reliability comes from orchestration:
+
+- **Three constrained calls** (understanding, writer, independent checker), each with a JSON
+  schema and runtime validation. Invalid output is a typed failure with a fallback, never a
+  partial answer.
+- **Classification first**: 14 intents and 17 legal-area labels plus risk flags drive routing
+  and retrieval. Deterministic signals run before and after the model and can overrule it.
+- **Release-pinned knowledge**: typed entries (FAQ, service fact, price, offer, contact route,
+  link, boundary, legal-area guidance) with scope, validity window, approval and immutable
+  versions. Only entries pinned by the active release can be retrieved.
+- **Grounding is checked, not trusted**: every price, URL, phone and offer term in a draft must
+  exist in a cited approved entry; unsolicited prices are removed; legal verdicts, invented
+  call-backs and unneeded emergency numbers are refused.
+- **A response hierarchy**: full answer → bounded orientation → partial answer and
+  clarification → honest contact route → approved fallback → person.
+- **Portable by configuration**: a new organization means new knowledge, a new release
+  manifest (policy, style, approved texts, auto-send intents) and the same engine.
+
+→ [docs/knowledge-system.md](docs/knowledge-system.md) · [docs/adapting.md](docs/adapting.md)
+
+## Testing and evidence
+
+| Evidence | Value | What it is | What it is not |
+|---|---|---|---|
+| Automated tests at `8e22656`, messaging bot | **2,808 unit (116 files) + 593 integration (49 files) = 3,401**, re-run 9 Nov 2026, 0 failed. Whole repository incl. the separate Content Bot: 3,985 + 886 = 4,871 | Deterministic, scripted model outputs, fake Meta transport, **real PostgreSQL** | Model-quality evidence |
+| r4 paid evaluation `269a650d` (29 Oct) | 107/107 cases completed; action accuracy **98.1 %** (pass); auto-reply appropriateness 90.5 % (**fail**, gate ≥ 98 %) | Fresh real-model run on a labelled synthetic + historical dataset | A gate pass: one mandatory gate failed; the diagnosis led to fix `56c26d5` |
+| Real-model dry run (28 Oct) | 92/93 legitimate messages auto-sent (98.9 %), 0/11 human-control cases sent, 0 unsolicited amounts | Real Anthropic models through the real pipeline, eligibility and dispatcher recheck; nothing published | Accuracy; production traffic |
+| r5 paid evaluation (3 Nov) | 134/134 completed, gates **failed** | Fresh real-model run | Why r5 went LIVE (see below) |
+| r5 LIVE (3 Nov →) | Owner-approved release (`owner-approved-v1`), real Meta delivery observed by the owner | Production | Measured quality: the approval record states `evaluatedCases: 0` |
+
+The paid evaluation became optional by an explicit owner decision (ADR 0005). The system says
+so: an owner approval is recorded as an owner approval, not as measured quality. Safety rests on
+the runtime invariants, which never read the evaluation. → [docs/testing-and-evaluation.md](docs/testing-and-evaluation.md)
+
+## Production incidents and what they changed
+
+Three real findings from operating the system. Each one is a problem, a root cause and a code change.
+
+| Finding | Root cause | Change |
+|---|---|---|
+| The admin console said "nothing was sent" for a reply that **had** been posted (Facebook "edit and send", seen in operation) | Meta listed our own reply back with different text normalization (NFD, zero-width and non-breaking characters) or a `{post}_{comment}` id. Reconciliation of the unknown outcome gave up, and the next send classified our own reply as someone else's (`ANSWERED_ELSEWHERE`) | `own-reply-match.ts`: NFC, invisible-character stripping, both id forms, attempt-time window. Fixed on all four surfaces; the item ends `sent` / `reconciled_sent` without a second write |
+| A real Instagram DM asking for help with a workplace-harassment legal problem ("nasilje") was held as a threat (3 Nov, under r5 LIVE) | The deterministic violence signal and the model's threat reading each made it human-only, the approved fallback was blocked by the same flag, and the LIVE signal would have refused an automatic send anyway | `HARM_TOPIC_LEGAL_REQUEST` (ADR 0006): harm vocabulary inside a legal-help request is a legal topic, but only with none of acute danger, threat, self-harm, distress or a minor. It then goes through the ordinary tiers and validators; real threats still go to a person |
+| The paid r4 evaluation failed a gate (auto-reply appropriateness 90.5 %, need 98 %), including two reported critical violations | The two critical hits were **scorer** false positives (a correctly declined statement such as "I cannot confirm that this is the right number" matched a forbidden-claim pattern). The other failures were **pipeline** bugs: the unsolicited-price stripper removed prices people had asked for ("70 evrov", a price asked in the previous turn, package comparisons) | `56c26d5`: non-assertive-statement rules in the scorer, with negative controls that stay critical; a corrected price-question detector. A cache-only replay of the real-model dry run changed 1 of 143 cases |
+
+→ [docs/evolution.md](docs/evolution.md) · [docs/testing-and-evaluation.md](docs/testing-and-evaluation.md)
+
+## Why LIVE without a passing evaluation
+
+The r5 paid run completed 134 of 134 cases and **failed the gates**. The owner then decided that the
+paid evaluation is optional (ADR 0005), and r5 went LIVE as an **owner-approved** release
+(`basis: owner_approval`, `evaluatedCases: 0`). That is a business decision, recorded as one. It is
+not evidence of reply quality, and nothing in this repository presents it as such.
+
+What carries the safety instead is runtime code that never reads an evaluation result:
+
+- **Hard-signal holds.** Threats, self-harm, distress, minors, prompt injection, privacy requests,
+  refund disputes and critical risk go to a person, at decision time and again at dispatch.
+- **Grounding and knowledge eligibility.** Every price, link, phone number and offer term must exist
+  in a cited approved, in-scope, unexpired entry; unsolicited prices are removed; legal verdicts are refused.
+- **Approved fallback.** When the model output is unusable or the model fails, the release's approved
+  generic text is sent, unless a hard signal forbids even that.
+- **Dispatcher pre-send recheck.** Pause, mode, scope, release, source still existing, human takeover,
+  prior replies, messaging window and knowledge validity are checked again immediately before the write.
+- **Least-permissive mode and pause.** The effective mode is the minimum of ceiling, global and account
+  mode; a pause stops new sends at once (it cannot recall a request already sent, and the UI says so).
+- **Authorization bound to the code.** The LIVE authorization is tied to the release checksum and to
+  the behavior and dispatch code fingerprints, so a deploy that changes either stops automatic
+  sending until the owner re-authorizes (free, audited).
+- **A delay window with manual takeover.** Replies wait 60 s; staff can send now, cancel or write
+  their own message, which cancels the pending automatic reply.
+
+**Monitoring.** `release-status` reports automatic coverage as *handled* versus *delivered*; unknown
+delivery outcomes are reconciled and tracked; permanent rejections, exhausted retries and unresolved
+outcomes log a structured `DELIVERY_NEEDS_OPERATOR` alert.
+
+**Rollback.** Activate the previous approved release (one click; approval refuses a release with no
+rollback target), pause, or lower the mode (always allowed, audited). **Not provided:** measured
+quality for r5. Its quality rests on the owner's judgment, the deterministic validators and the
+invariants above. → [docs/autonomous-live-mode.md](docs/autonomous-live-mode.md)
+
+## Quick start
+
+```bash
+git clone https://github.com/gabercmatej/Meta-message-answering-bot.git
+cd Meta-message-answering-bot
+
+# 1. Interactive demo (no keys, no backend)
+cd apps/demo && npm ci && npm run dev          # http://localhost:5173
+npm test && npm run build                      # 144 unit tests, static build
 ```
 
-One strict TypeScript repository and a modular application rather than microservices: separate API
-and worker processes, PostgreSQL as both the system of record and the job queue, and a small
-authenticated admin console. Domain and policy, Meta adapters, context, knowledge, AI, publishing
-and evaluation are separate modules. Live events, the admin preview, Test Lab and historical replay
-all run the same decision pipeline; only the publishing sink differs.
+Node.js 20+. No database, network access or credentials. What the public build
+does **not** include, and what a real integration would need: [docs/adapting.md](docs/adapting.md).
 
-More: [docs/architecture.md](docs/architecture.md) and
-[docs/deployment-overview.md](docs/deployment-overview.md).
+## Repository map
 
-## Validation
+| Path | Contents |
+|---|---|
+| [`apps/demo`](apps/demo/) | Interactive architecture simulation (React + Vite, static, Vercel-ready) |
+| [`docs/`](docs/) | Architecture, autonomy, challenges, knowledge, Meta, testing, deployment, privacy, evolution |
+| [`diagrams/`](diagrams/) | Mermaid sources for every diagram |
+| [`screenshots/`](screenshots/) | Current UI (November 2026); [`archive-2026-10-01/`](screenshots/archive-2026-10-01/) holds the REVIEW-era set |
+| [`examples/`](examples/) | Sanitized, synthetic decision, webhook, draft and knowledge records |
+| [`scripts/privacy-scan.mjs`](scripts/privacy-scan.mjs) | Dependency-free secret/PII/identifier scanner for the tree and Git history |
+| [`WHATS_PUBLIC.md`](WHATS_PUBLIC.md) | What is synthetic, what stays private, screenshot provenance, licence |
 
-**733 automated tests**: 511 unit tests and 222 PostgreSQL integration tests in 51 test files, plus
-lint, TypeScript type checking and the production build. All passed in the run measured on
-1 October 2026, in a fresh clone without credentials. Integration tests run against real
-PostgreSQL, not mocks, and no test calls the real Meta API or a real model.
+## Project evolution
 
-What is tested:
+| Date (2026) | Milestone |
+|---|---|
+| 28–30 Sep | Four-surface normalization from real Meta webhook shapes; GET-only Graph transport; Test Lab; release-pinned AI routing with Anthropic; first real-model evaluation and fixes; REVIEW lifecycle; controlled write verification |
+| 1 Oct | Production in **REVIEW**; Messenger and Instagram DM write-verified; first public showcase |
+| 8–20 Oct | Slovenian operator UI; conversation inbox (v2.0); continuous messaging after a confirmed reply; conversation engine and knowledge v2 |
+| 21–26 Oct | r3: owner-approved knowledge, evaluation policy `review-evidence-v1`, one-click LIVE switch, fail-closed LIVE eligibility |
+| 26–28 Oct | r4 **autonomy-v1**: tiered autonomy, bounded legal orientation, DM bursts, own-reply matching fix, configurable delay, approved fallback level |
+| 28–29 Oct | All four Meta endpoints write-verified (owner-reported); manual messages after automatic replies; paid r4 run 269a650d fails one gate → scorer and price-stripper fixes |
+| 3 Nov | r5: mandatory formal address, narrowed risk signals; `owner-approved-v1` releases; **full autonomy** (AI-failure fallback, resend after confirmed absence, operator alerts); r5 LIVE at 60 s |
+| 9 Nov | Showcase v2: current screenshots, live interactive architecture demo; engine extract prepared, held pending authorization |
 
-- webhook signatures and payload normalization
-- malformed Meta events and duplicate events
-- sender context
-- knowledge retrieval and AI routing
-- the REVIEW lifecycle and publishing gates
-- idempotency and exactly-once behaviour, including lost write responses and crashes
-- controlled write verification and access readiness
-- Test Lab and the evaluation tooling
+→ [docs/evolution.md](docs/evolution.md)
 
-Two synthetic evaluation datasets (a 54-case smoke suite and a 90-case Slovenian legal corpus) are
-used as **regression signals**, not as quality measurements. Release approval for a real-model
-release requires a fresh-model replay that passes mandatory gates.
+## Security and privacy
 
-![Replay run of a synthetic regression suite with mandatory gates](screenshots/09-replay-gates.png)
+- Screenshots, demo content and examples are **synthetic**. The automated privacy scan covers the
+  working tree and the public Git history ([`scripts/privacy-scan.mjs`](scripts/privacy-scan.mjs)), and
+  every screenshot was reviewed by eye.
+- In production: text is redacted before it reaches the AI provider, the model sees a
+  pseudonymous author, tokens never reach the browser, logs are structured and redacted,
+  reviewer-only identity data is pruned on a schedule.
+- Report a vulnerability: [SECURITY.md](SECURITY.md). Details: [docs/privacy-and-security.md](docs/privacy-and-security.md).
 
-*A replay run with mandatory release gates. With synthetic cases and a stand-in model, the UI labels
-the run as engineering regression evidence, not proof of answer quality.*
+## Screenshot provenance
 
-More: [docs/testing-and-evaluation.md](docs/testing-and-evaluation.md).
-
-## Engineering highlights
-
-- **One decision pipeline** for SHADOW, REVIEW and LIVE, the admin preview, Test Lab and replay.
-  Modes differ only at dispatch eligibility.
-- **A human-in-the-loop legal workflow** with an immutable AI draft, a separate human final text and
-  a full audit trail.
-- **Structured, versioned legal knowledge** pinned by immutable, checksummed behavior releases that
-  are evaluated before activation.
-- **Facebook and Instagram webhook normalization** for four surfaces, with separate adapters, string
-  IDs and quarantine for unknown shapes.
-- **Durable ingestion before acknowledgement**: the signature is checked over the original bytes, and
-  the receipt, events and queue job commit together.
-- **Code-controlled safety and eligibility**, enforced again in PostgreSQL constraints and triggers.
-- **Idempotent outbound publishing** with write-ahead attempt state and honest `outcome_unknown`
-  reconciliation.
-- **Per-surface write verification** before any surface can send.
-- **Sender, post and thread context** for reviewers, while the model sees only a pseudonym and
-  redacted text.
-- **A 733-test suite** with real-PostgreSQL integration tests and fault injection.
-- **Production deployment and readiness tooling**: fail-closed configuration, access-health checks,
-  a REVIEW readiness gate and a read-only public traffic diagnostic.
-
-## Status
-
-As of **1 October 2026**, rollout is staged on purpose: each surface goes live for public users only
-after it has been proven end to end.
-
-| Surface or capability | Implemented | Controlled write verification | Production mode |
-|---|---|---|---|
-| Facebook Messenger | Yes | **Verified** | REVIEW |
-| Instagram DM | Yes | **Verified** | REVIEW |
-| Facebook comments | Yes | Pending: needs public delivery after Meta approval | REVIEW, sending blocked |
-| Instagram comments | Yes | Pending: needs public delivery after Meta approval | REVIEW, sending blocked |
-| Bot LIVE / autosend | Architecture exists | n/a | **Not enabled** |
-
-**Meta:** Business Verification is verified. Access Verification and App Review (messaging and comment
-permissions, plus Business Asset User Profile Access) are in review. The Meta app is unpublished
-(Development mode), so only people with a role on the app currently produce events.
-
-**Next:** after Meta approval, publish the Meta app (the bot stays in REVIEW), test all four surfaces
-with ordinary public accounts, write-verify both comment surfaces, then run a REVIEW stabilization
-period on real traffic. Controlled LIVE autosend is a separate future phase.
-
-![Facebook comment with post context and a "sending not verified" lock](screenshots/06-comment-awaiting-verification.png)
-
-*A Facebook comment shown with its post context. The draft is ready, but sending stays locked until
-the surface passes a controlled write verification.*
-
-![Meta readiness: messaging verified, comments not verified, app in development](screenshots/12-meta-readiness.png)
-
-*Meta readiness is tracked separately from bot modes. This synthetic instance mirrors production:
-messaging verified, comments not verified, app in Development, Advanced Access pending, Business
-Verification verified.*
-
-More: [docs/meta-integration.md](docs/meta-integration.md#current-status-1-october-2026).
-
-## Privacy
-
-- Product screenshots and examples use **synthetic data** from a local, isolated instance: invented
-  senders and messages, demo account names and showcase-written knowledge entries. They used a
-  deterministic stand-in model and fake Meta and publishing adapters.
-- The two operational screenshots (the Meta Developer app and the production hosting panel) are real
-  and were redacted: the App ID and the server account path are removed.
-- In production, text is redacted before it reaches the AI provider, the model sees only a
-  pseudonymous author, reviewer-only identity data is pruned on a schedule, and logs are structured
-  and redacted.
-- No tokens, credentials, account or page IDs, prompts or proprietary legal knowledge appear here.
-
-More: [docs/privacy-and-security.md](docs/privacy-and-security.md).
-
-## Deep dives
-
-- [Architecture](docs/architecture.md): modules, boundaries, data model and technology choices
-- [Message lifecycle](docs/message-lifecycle.md): from webhook bytes to one sent reply
-- [Safety and review](docs/safety-and-review.md): modes, the decision pipeline, invariants, review actions
-- [Knowledge system](docs/knowledge-system.md): schema, retrieval, uncertainty handling, releases
-- [Meta integration](docs/meta-integration.md): API contract, surfaces, write verification, diagnostics
-- [Testing and evaluation](docs/testing-and-evaluation.md): test suite, datasets, replay and gates
-- [Deployment overview](docs/deployment-overview.md): runtime topology, configuration, rollback
-- [Privacy and security](docs/privacy-and-security.md): data minimization, access control, curation
-- [Diagrams](diagrams/architecture.md) · [Examples](examples/README.md) · [Source excerpts](src-showcase/README.md)
+All product screenshots in [`screenshots/`](screenshots/) were captured on 9 November 2026 from
+the production admin build at commit `8e22656`, run locally against a throwaway embedded
+PostgreSQL. The pipeline, autonomy policy, validators, scheduler and dispatcher are the real
+code. The Meta adapter and publish transport are fakes (nothing left the machine), the model is a
+scripted stand-in (no paid calls), and every person, message and post is invented. Status panels
+use a production-shaped configuration with dummy credentials, so they read "graph" while sending
+goes to the fake. The knowledge view is filtered to synthetic entries. Bot replies contain the company's public
+phone number and opening hours, and 07 and 10 show the r5 approved fallback text verbatim; both
+are what every customer receives anyway. The other reply texts were written for the capture.
+Exactly one case (07 and 10) is a
+deliberately injected model timeout, to show the fallback path. A few status strings in the
+Slovenian UI are still English in this build, and two settings texts predate LIVE mode; they are
+shown as captured, not edited. Captures are 1.5× scale; the hero is a 2×2 composition of the same
+captures with English pane titles added. The October REVIEW-era set in
+[`screenshots/archive-2026-10-01/`](screenshots/archive-2026-10-01/) was captured the same way from
+invented data. See also [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
 
 ## About
 
-Designed and implemented by **Matej Gaberc** ([@gabercmatej](https://github.com/gabercmatej)) as a
-production system for Pravnik na dlani. The scope was the end-to-end V1 conversation workflow: Meta
-integration, the decision pipeline, knowledge and release management, the review workspace, the
-publisher, evaluation tooling and deployment. The system runs in production in REVIEW mode and is
-waiting on Meta's review before public launch.
+Designed, implemented and operated by **Matej Gaberc** ([@gabercmatej](https://github.com/gabercmatej))
+for Pravnik na dlani: Meta integration, the decision pipeline and autonomy policy, knowledge and
+release management, the React operator console, the publisher and reconciliation, evaluation
+tooling, deployment and production operations. All commits in the private repository come from
+the author's account. Much of the implementation was written with AI coding agents (Claude Code)
+working under the author's direction and review, as the project log records; the architecture,
+invariants, verification and production operation are the author's. Product and policy decisions,
+such as autonomy scope and the optional paid evaluation, were made by the business owner and are
+recorded as such.
 
 ---
 
-© 2026 Matej Gaberc. Portfolio case study; no licence is granted to use, copy or redistribute the
-implementation. See [NOTICE.md](NOTICE.md).
+<sub>© 2026 Matej Gaberc. Portfolio case study. No licence is granted for any part of this repository; see [NOTICE.md](NOTICE.md) and [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
+"Pravnik na dlani" is named for context only; this repository is not an official channel of the
+company and nothing here is legal advice.</sub>

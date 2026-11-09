@@ -1,0 +1,32 @@
+[
+  {
+    "rule": "long_numeric_id",
+    "path": "examples/sanitized-webhook.json",
+    "match": "^1790842500000$",
+    "reason": "Millisecond epoch timestamp (1 Oct 2026 08:15 UTC) of a synthetic example event, not an account or user id."
+  },
+  {
+    "rule": "email",
+    "path": "apps/demo/src/sim/simulator.test.ts",
+    "match": "^ana@example\\.org$",
+    "reason": "RFC 2606 reserved example.org address used to test the demo's redaction of personal data."
+  },
+  {
+    "rule": "phone_si_international",
+    "path": "apps/demo/src/sim/simulator.test.ts",
+    "match": "^\\+386 00 000 000$",
+    "reason": "All-zero synthetic number used to test the demo's phone redaction; not a real number."
+  },
+  {
+    "rule": "phone_si_local",
+    "path": "apps/demo/src/sim/simulator.test.ts",
+    "match": "^00 000 000$",
+    "reason": "Local-format tail of the same all-zero synthetic number in the demo's redaction test."
+  },
+  {
+    "rule": "email",
+    "path": "commit:",
+    "match": "(^noreply@github\\.com$|@users\\.noreply\\.github\\.com$)",
+    "reason": "GitHub-issued noreply commit addresses (the author's public noreply address and GitHub's web-commit committer); not personal contact data."
+  }
+]

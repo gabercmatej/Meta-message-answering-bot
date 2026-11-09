@@ -1,7 +1,15 @@
 # Message lifecycle
 
-From the raw webhook bytes Meta sends to exactly one human-approved reply. Status as of
-**1 October 2026**. Diagram: [../diagrams/message-flow.md](../diagrams/message-flow.md).
+> **Updated 9 November 2026.** Sections 1 to 3 (acceptance, normalization, worker processing) are
+> unchanged since the October REVIEW phase. Sections 4 to 6 are rewritten for the current LIVE
+> behaviour (release r5): eligible items are scheduled automatically, and unknown delivery outcomes
+> follow the r5 recovery rules. REVIEW-era behaviour is kept where it still applies to items a
+> person handles. See [autonomous-live-mode.md](autonomous-live-mode.md) and
+> [../diagrams/state-machine.md](../diagrams/state-machine.md).
+
+From the raw webhook bytes Meta sends to exactly one reply: scheduled automatically when the item
+passes eligibility, or approved by a person otherwise. Diagram:
+[../diagrams/message-flow.md](../diagrams/message-flow.md).
 
 ## 1. Webhook acceptance (API process)
 
@@ -111,11 +119,16 @@ processed).
 existence is re-read from Meta). Edits after a draft change the stored text hash; the dispatcher
 compares it with the hash the draft answered and refuses to send (`SOURCE_EDITED`).
 
-## 4. Human review (Messages)
+## 4. Scheduling and human review (Messages)
 
-In REVIEW, every reply item that is not skipped waits in **Messages** as `needs_review`. The server
-computes `allowedActions`. The UI only renders what the server allows, and a stale `rowVersion` is
-a 409. Details: [safety-and-review.md](safety-and-review.md#human-review).
+When the decision is applied to the reply item, `autoSendEligibility()` runs on the result. In LIVE
+an item that passes becomes `scheduled` (`scheduled_by = auto`, `scheduled_for = received + delay`,
+60 s in production); messages from the same person that arrive inside the window are merged into
+one decision. Every other item that is not skipped waits in **Messages** as `needs_review`
+(in REVIEW, which was the only path in October, that is every item). The server computes
+`allowedActions`. The UI only renders what the server allows, and a stale `rowVersion` is a 409.
+A scheduled item can be sent now or cancelled by staff, and a queued manual message cancels it.
+Details: [safety-and-review.md](safety-and-review.md#human-review).
 
 ## 5. Dispatch (publishing module)
 
@@ -139,17 +152,30 @@ write. It runs in the worker's publisher pass:
    - `sent`: store the platform id; the item becomes `sent` (final; a DB trigger refuses changes).
    - definite rejection: `failed` (permission, auth, window closed, ...), or a bounded retry
      (at most 3 attempts in total) only for throttling.
-   - **timeout, network failure, 5xx, or 2xx without an id**: `outcome_unknown`. Never resent.
+   - **timeout, network failure, 5xx, or 2xx without an id**: `outcome_unknown`. Never resent
+     blindly; see section 6.
 
 ## 6. Unknown outcomes and reconciliation
 
 - A crash between step 3 and 5 leaves a `pending` attempt. After 5 minutes `recoverStalePending()`
   turns it into `outcome_unknown` (`crash_recovery`).
 - `reconcileUnknown()` reads Meta (replies under the target comment, or the conversation) looking
-  for a business-authored message with the same normalized text in the time window. Found: the
-  attempt becomes `reconciled_sent` and the item `sent`. Not found after 3 successful reads: the
-  item goes back to a human as `OUTCOME_UNKNOWN_NOT_FOUND` with the instruction to check Facebook /
-  Instagram before sending again. A failed read does not count as "not found".
+  for a business-authored message with the same normalized text in the time window. The matching
+  tolerates how Meta lists the reply back (Unicode normalization, invisible characters, both
+  comment id forms). Found: the attempt becomes `reconciled_sent` and the item `sent`. A failed
+  read does not count as "not found".
+- **Not found after 3 successful reads**, the attempt becomes `reconciled_absent`, and what happens
+  next depends on who wrote the reply:
+  - **Automatic reply (r5, ADR 0006):** the item is scheduled again two minutes later and sent
+    again, at most 3 attempts in total. Before that write the dispatcher reads Meta once more and
+    treats a late-visible earlier attempt as delivered, and every pre-send check (pause, mode,
+    release, window, age, duplicates) runs again.
+  - **Human reply, or all 3 attempts used:** the item goes back to a person as
+    `OUTCOME_UNKNOWN_NOT_FOUND` with the instruction to check Facebook / Instagram before sending
+    again. A person's reply is never resent automatically.
+- An unresolved outcome, a permanent rejection or exhausted throttling retries log a structured
+  `DELIVERY_NEEDS_OPERATOR` alert, and `release-status` shows automatic coverage as *handled*
+  versus *delivered*.
 - A unique partial index allows **at most one open (`pending` / `outcome_unknown`) attempt per reply
   item**, so a parallel send or a blind resend is refused by the database.
 

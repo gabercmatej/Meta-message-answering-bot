@@ -24,7 +24,7 @@ certificates, runbooks) are intentionally omitted.
    processed).
 5. Process queued events until the queue is empty or the time budget (about 50 seconds) is used.
 6. **Publisher pass** (only when a publishing transport is configured): crash recovery of stale
-   pending attempts, dispatch of human-approved items, reconciliation of unknown outcomes.
+   pending attempts, dispatch of due scheduled and approved items, reconciliation of unknown outcomes.
 7. If the event queue was emptied, advance queued Test Lab replay runs with any remaining budget; a
    replay pauses between cases at the deadline and resumes on the next run.
 8. Write an end heartbeat with counts and exit.
@@ -43,12 +43,16 @@ exists and no publisher runs.
 - Secrets (Meta app secret, verify token, Page token, AI provider key, database URL) live only in
   the server environment. They are never committed, never logged (structured logs with redaction)
   and never sent to the admin browser.
-- Production settings in effect on 1 October 2026: `BOT_MODE=REVIEW`, `PUBLISHING_TRANSPORT=graph`,
-  `LIVE_AUTOSEND_ENABLED=false`, `AI_PROVIDER=anthropic`, `META_ADAPTER=graph`.
+- Production settings since 3 November 2026 (owner-reported): `BOT_MODE=LIVE`,
+  `LIVE_AUTOSEND_ENABLED=true`, `PUBLISHING_TRANSPORT=graph`, `AI_PROVIDER=anthropic`,
+  `META_ADAPTER=graph`; release r5, delay 60 s. (1 October 2026: `BOT_MODE=REVIEW`, autosend off.)
+- **Deploys and LIVE authorization.** A deploy that changes behavior or dispatch code stops automatic
+  sending until the owner re-runs the free `release-approve` re-authorization. Rolling code back
+  means re-activating the matching release as well.
 
 ## Database migrations
 
-14 explicit SQL migrations, applied in order with checksums. Editing an applied migration fails
+23 explicit SQL migrations for the messaging bot (`0001`–`0014`, `0200`–`0208`), applied in order with checksums. Editing an applied migration fails
 loudly. Later migrations are written to be additive and backward-compatible (new tables, nullable
 columns, widened checks), so a previous build can run against a newer schema during a rollback.
 The worker refuses to start against a database missing a migration. Migrations are covered by

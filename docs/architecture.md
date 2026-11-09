@@ -1,8 +1,9 @@
 # Architecture
 
-> Status as of **1 October 2026**. Everything below describes code that exists in the private
-> repository. Where something is built but switched off (LIVE autosend) or not yet proven against
-> real traffic (comment surfaces), it is labelled that way.
+> Updated **9 November 2026** for production commit `8e22656` (release `pnd-v1-anthropic-r5`, LIVE
+> with automatic replies on all four surfaces). Everything below describes code that exists in the
+> private repository. The October 2026 version of this page described REVIEW-only operation; see
+> [evolution.md](evolution.md) for what changed.
 
 ## Shape of the system
 
@@ -15,7 +16,7 @@ processes, not microservices.
 | **API process** (Fastify) | Meta webhook endpoint (signature check over raw bytes, durable acceptance), authenticated admin API, static admin UI, health endpoints |
 | **Worker process** | Processes queued events: Meta reads, context snapshot, decision pipeline, reply items, publisher pass, reconciliation, Test Lab replay jobs |
 | **PostgreSQL** | All application state, plus the job queue (pg-boss in its own schema). Invariants are also enforced by CHECK constraints and triggers |
-| **Admin console** (React + Vite, built to static files) | Home, Messages (the human review workspace), Knowledge, Test Lab, Settings |
+| **Admin console** (React + Vite, built to static files) | Home, Overview, Messages (unified conversation inbox with countdowns, manual composer and review), Knowledge, Test Lab, Settings (mode, LIVE switch, delay, releases, integrations) |
 
 Diagram: [../diagrams/architecture.md](../diagrams/architecture.md).
 
@@ -27,11 +28,11 @@ Diagram: [../diagrams/architecture.md](../diagrams/architecture.md).
 | `meta` | Webhook signature verification, payload normalization, Graph **read** adapters (Facebook and Instagram kept separate), permission inventory | Write to Meta |
 | `context` | Immutable, bounded `ContextSnapshot` (comment or DM, thread / conversation, post, campaign briefs, explicit unknowns) | Carry sender names or avatars |
 | `domain` | Modes, intents (categories), legal areas, risk vocabulary, redaction | Depend on infrastructure |
-| `behavior` | Versioned, immutable release manifests; scoped overrides; approval / activation / rollback / revocation | Loosen code invariants |
+| `behavior` | Versioned, immutable release manifests; scoped overrides; approval policies (evaluation evidence or `owner-approved-v1`); LIVE authorization bound to code fingerprints; activation / rollback / re-authorization | Loosen code invariants |
 | `knowledge` | Knowledge schema, eligibility (approved / validity window / scope), keyword retrieval, contradiction detection | Ground replies with unapproved or unpinned entries |
 | `ai` | Provider contract, release-pinned routing (Anthropic, fake, recorded), structured-output schemas, usage ledger | Hold a Meta token, a publisher, or database access |
-| `pipeline` | `runDecisionPipeline()`: the single decision function; deterministic validators | Know the runtime mode or publish |
-| `inbox` | Reply items (the "Messages" workspace), human review actions, sender lookup for reviewers | Write to Meta |
+| `pipeline` | `runDecisionPipeline()`: the single decision function; inbound and LIVE signals; deterministic validators; the autonomy policy (`autonomy.ts`: tiers, `fallbackBlockers`, harm-as-legal-topic) | Know the runtime mode or publish |
+| `inbox` | Conversations, reply items, DM burst coalescing (`burst.ts`), manual messages, hold-reason categories, review actions, sender lookup for reviewers | Write to Meta |
 | `publishing` | **The only module that may write to Meta**: eligibility, dispatcher, Graph POST transport, controlled write verification, reconciliation | Be imported by AI / pipeline / evaluation code |
 | `evaluation` | Datasets, frozen cases, replay, scoring, gates, comparisons, ratings | Publish (simulated publisher only) |
 | `operations` | Runtime controls (mode, pause), accounts, audit log, access health, REVIEW readiness gate, traffic diagnostic, heartbeat | — |
@@ -55,8 +56,8 @@ The two most important boundaries are enforced mechanically, not by convention:
 - Test Lab replay runs and offline evaluation.
 
 The pipeline does not know the runtime mode and has no publishing capability. Callers decide what
-to do with the result: store it as SHADOW evidence, create a reply item for human review, or (only
-in a future LIVE phase) schedule it. Modes therefore differ **only at dispatch eligibility**, not in
+to do with the result: store it as SHADOW evidence, create a reply item for human review, or, in
+LIVE, schedule it for automatic sending after the configured delay. Modes therefore differ **only at dispatch eligibility**, not in
 how a decision is made. See [message-lifecycle.md](message-lifecycle.md) and
 [safety-and-review.md](safety-and-review.md).
 
@@ -74,8 +75,9 @@ separate code path with a simulated publisher. Diagram: [../diagrams/mode-flow.m
 
 ## Data model (shape only)
 
-14 explicit, additive SQL migrations (`db/migrations/0001` to `0014`), applied with checksums that
-fail loudly if an applied migration is edited. The main tables:
+23 explicit, additive SQL migrations for the messaging bot (`0001`–`0014`, `0200`–`0208`; the
+`01xx` range belongs to a separate Content Bot module in the same repository), applied with
+checksums that fail loudly if an applied migration is edited. The main tables:
 
 | Area | Tables |
 |---|---|
@@ -84,7 +86,7 @@ fail loudly if an applied migration is edited. The main tables:
 | Campaign context | `context_profiles`, `context_profile_versions`, `content_profile_mappings` |
 | Behavior and knowledge | `behavior_releases` (immutable), `activations` (scope pointer), `activation_history`, `knowledge_entries`, `knowledge_versions` |
 | Decisions | `decisions` (result JSON, reason codes, source refs, release checksum, intent, legal area, risk level) |
-| Review and publishing | `reply_items`, `publish_attempts`, `publishing_settings`, `platform_capabilities`, `write_verifications` |
+| Conversations and publishing | `conversations`, `reply_items`, `publish_attempts`, `manual_messages` (with `resolves_item_ids`), `ai_draft_requests`, `publishing_settings` (delay, daily limit), `platform_capabilities`, `write_verifications` |
 | Evaluation | `eval_datasets`, `eval_cases`, `eval_runs`, `eval_results`, `eval_labels`, `eval_ratings` |
 | Operations | `runtime_controls`, `managed_accounts`, `users`, `sessions`, `audit_events`, `access_health_runs`, `service_heartbeats`, `ai_usage`, `meta_app_status` |
 
@@ -103,8 +105,22 @@ Recorded as architecture decision records in the private repository:
 | Zod at every external boundary | Webhook payloads, AI outputs, manifests, knowledge bodies, API bodies, evaluation cases |
 | Local username/password admin auth (scrypt, DB sessions, HTTP-only SameSite=Strict cookie, CSRF header, login throttling) | Roles (`viewer`, `editor`, `owner`) are enforced server-side |
 
+## Trade-offs, stated plainly
+
+| Decision | Bought | Paid |
+|---|---|---|
+| Modular monolith, not services | One deploy, one transaction boundary, simple local dev | Worker and API scale together, which is fine at this traffic level |
+| PostgreSQL as the queue (pg-boss) | Webhook acceptance and job creation are atomic; no broker to run | Queue throughput bounded by the DB, orders of magnitude above need |
+| Deterministic policy around the model | Predictable, testable, explainable reason codes | Signal lists need maintenance; false positives were found and narrowed in r4/r5 |
+| Release manifests + code fingerprints | No silent behavior change; rollbacks are one pointer move | Every behavior deploy pauses auto-send until owner re-authorization |
+| Delay before automatic sends | Bursts merge, staff can cancel, nothing feels instant-robotic | Up to 60 s latency on every automatic answer |
+| Write-ahead + `outcome_unknown` | No double posts on a public page | Rare replies wait one reconcile interval |
+| Real PostgreSQL in tests | Concurrency, constraints and triggers are actually exercised | Slower suite (integration ≈ minutes), embedded-PG port management |
+
 ## Related documents
 
+- [autonomous-live-mode.md](autonomous-live-mode.md): LIVE, delays, fallback, owner approval
+- [engineering-challenges.md](engineering-challenges.md): problems and decisions
 - [message-lifecycle.md](message-lifecycle.md): from webhook bytes to a sent reply
 - [safety-and-review.md](safety-and-review.md): invariants, REVIEW workflow, publishing safeguards
 - [knowledge-system.md](knowledge-system.md): knowledge schema, retrieval, releases

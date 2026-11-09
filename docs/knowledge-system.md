@@ -1,7 +1,15 @@
 # Knowledge system
 
+> **Updated 9 November 2026.** The knowledge model (entries, versions, scope, eligibility,
+> retrieval, grounding) is unchanged since October. Two things changed and are marked below: the
+> **escalation table** describes the October baseline, and since the autonomy releases several of
+> those cases end in a bounded orientation, an honest contact route or the approved fallback
+> instead of review ([autonomous-live-mode.md](autonomous-live-mode.md)); and **release approval**
+> now has two bases (see "Releases"). Current state diagram:
+> [../diagrams/state-machine.md](../diagrams/state-machine.md).
+
 How the bot knows what it may say, and how that knowledge is versioned, scoped, retrieved and kept
-apart from legal guidance. Status as of **1 October 2026**. Diagram:
+apart from legal guidance. Diagram:
 [../diagrams/knowledge-flow.md](../diagrams/knowledge-flow.md).
 
 > The knowledge corpus itself (service descriptions, prices, legal-area guidance) is proprietary and
@@ -148,6 +156,12 @@ check every figure, contact, URL and offer term in the draft against the cited e
 
 ## Uncertainty handling and escalation
 
+The table is the October (REVIEW-era) baseline. In autonomy releases (r4/r5) the same situations
+first try the response hierarchy: full answer, bounded orientation, partial answer with a
+clarifying question, an honest contact route (for example no approved price means no amount, only
+the route), the release's approved fallback, and only then a person. Hard-risk signals always
+end with a person.
+
 | Situation | Outcome |
 |---|---|
 | No approved fact for a product, price or contact question | `review` (`MISSING_APPROVED_FACT` / `MISSING_PRICE_OR_OFFER_FACT`) |
@@ -173,11 +187,18 @@ Lifecycle (`src/behavior/repository.ts`):
 1. **draft**: editing creates a new row with a parent pointer; a database trigger refuses updates
    to a stored manifest.
 2. **tested**: a completed replay run on that exact checksum.
-3. **approved**: requires the expected checksum, a completed evaluation run **on that checksum**
-   with mandatory gates passing, a human review note, and **every pinned knowledge version
-   approved**. A release that pins a real model can only be approved on **fresh-model** evidence;
-   fake or recorded runs are labelled "engineering evaluation only" and are refused. The approval
-   evidence (run id, dataset, checksum, provider kind, gate status, note) is stored with the release.
+3. **approved**: since the owner decision of 3 Nov 2026 (ADR 0005) approval records **either**
+   evaluation evidence for the exact checksum **or** an explicit owner approval.
+   - *Evaluation evidence* (`review-evidence-v1/v2`, `owner-fast-v1`): a completed run **on that
+     checksum** with the mandatory gates passing, a note, and every pinned knowledge version
+     approved. A release that pins a real model can only be approved on **fresh-model** evidence;
+     fake or recorded runs are labelled "engineering evaluation only" and are refused. The run id,
+     dataset, checksum, provider kind and gate status are stored with the release.
+   - *Owner approval* (`owner-approved-v1`): only the owner role, typing the first 12 hex characters
+     of the checksum and a note, after free technical checks recomputed in the approval
+     transaction (manifest and checksum, approved knowledge pins, clean code identity, formal
+     approved texts, a rollback release). It is stored as `basis: owner_approval` with
+     `evaluatedCases: 0` and is never presented as measured quality.
 4. **activated** through a **scope pointer** (`global` or `account:<id>`): an advisory lock plus
    optimistic concurrency on the current pointer, recorded in `activation_history` together with
    the approval evidence, and audited.
@@ -190,6 +211,9 @@ only). The pipeline re-validates the manifest and refuses to run a release whose
 match the running code (`RELEASE_ENGINE_MISMATCH`), so a prompt change in code can never silently
 alter an evaluated release.
 
-Production today runs one approved release backed by Anthropic models, approved on a fresh-model
-evaluation run. An earlier real-model release candidate failed its mandatory gates; it was kept
-unchanged with its failed evidence and never approved, and a corrected release was created instead.
+Production today runs release r5 (Anthropic models), approved by the **owner** with
+`owner-approved-v1`: its paid evaluation run (134 of 134 cases completed) failed the gates, and the
+owner decided that the paid evaluation is optional. The record states `evaluatedCases: 0`. The
+failed run stays attached as information and was not modified. Earlier, the first real-model
+release candidate (October) also failed its gates; it was kept unchanged with its failed evidence
+and never approved, and a corrected release was created instead.

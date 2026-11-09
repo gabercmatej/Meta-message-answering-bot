@@ -1,9 +1,22 @@
 # Meta integration
 
 How the bot connects to Facebook and Instagram, what Meta actually confirmed, and where the
-integration stands on **1 October 2026**.
+integration stands. Updated **9 November 2026**; the October snapshot is kept below as history.
 
-## Current status (1 October 2026)
+## Current status (November 2026, owner-reported)
+
+| Item | Status |
+|---|---|
+| Runtime | `BOT_MODE=LIVE`, global and per-account mode LIVE, LIVE switch on, `LIVE_AUTOSEND_ENABLED=true`, `PUBLISHING_TRANSPORT=graph`, `META_ADAPTER=graph`, `AI_PROVIDER=anthropic` |
+| Release | `pnd-v1-anthropic-r5`, approved with `owner-approved-v1`, automatic reply delay 60 s |
+| Write verification | All four endpoints **verified**: `facebook_comment_reply`, `messenger_send`, `instagram_comment_reply`, `instagram_dm_send`. The project log first records them verified in its 28–29 Oct entry (owner-reported); on 28 Oct, before that deploy, the two comment endpoints were still unverified |
+| Meta app mode and Advanced Access | Owner-recorded; not verified in this repository. The private log does not state when the app was published or which permissions Meta approved. What it does record is that comment write verification needed a published app and that all four endpoints verified afterwards |
+| Public traffic | Automatic replies delivered to ordinary users on Facebook and Instagram (owner-observed after the r5 / full-autonomy deploys) |
+
+The rest of this page describes the API contract and the verification method, which have not
+changed. The table below is the **1 October 2026** status, kept for the project history.
+
+## Status on 1 October 2026 (history)
 
 | Item | Status |
 |---|---|
@@ -21,8 +34,8 @@ integration stands on **1 October 2026**.
 | Instagram comments | **Not proven** | `instagram_comment_reply` **unverified, sending blocked** | `comments` field subscribed; Meta's dashboard test webhook reaches the system, the signature verifies and it normalizes as an Instagram comment, then stops at `UNMANAGED_ACCOUNT` (the test payload is not the managed account). A real comment cannot arrive while the app is unpublished |
 
 > **"Meta app Live" is not "bot LIVE."** Publishing the Meta app only lets Meta deliver events for
-> people without an app role. The bot stays in REVIEW, autosend stays off, and every reply still
-> needs a human. No environment change is expected when the app is published.
+> people without an app role. Bot LIVE was a separate, later owner decision, with its own switch,
+> readiness checks and release authorization.
 
 Next steps once Meta approves: publish the app, run the read-only access-health and REVIEW
 readiness checks, test public DMs and public comments with ordinary accounts, and verify each

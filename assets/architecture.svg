@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 590" font-family="Segoe UI, Inter, -apple-system, Helvetica, Arial, sans-serif">
+  <!-- Derived from diagrams/architecture.md; keep both in sync. -->
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker>
+    <marker id="w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0f62fe"/></marker>
+    <style>
+      .box{fill:#fff;stroke:#d5dbe5;stroke-width:1.2}
+      .grp{fill:#f6f8fb;stroke:#e2e7ef;stroke-width:1}
+      .t{font-size:15px;font-weight:600;fill:#0f172a}
+      .s{font-size:12px;fill:#475569}
+      .g{font-size:11px;font-weight:700;letter-spacing:.08em;fill:#64748b}
+      .e{stroke:#64748b;stroke-width:1.4;fill:none}
+      .wr{stroke:#0f62fe;stroke-width:2;fill:none}
+      .l{font-size:11px;fill:#64748b}
+      .lw{font-size:11px;fill:#0f62fe;font-weight:600}
+    </style>
+  </defs>
+  <rect width="1200" height="590" rx="18" fill="#ffffff"/>
+
+  <!-- Meta -->
+  <rect class="grp" x="24" y="40" width="190" height="380" rx="12"/>
+  <text class="g" x="40" y="66">META PLATFORM</text>
+  <rect class="box" x="40" y="84" width="158" height="70" rx="9"/><text class="t" x="54" y="112">Facebook Page</text><text class="s" x="54" y="132">comments · Messenger</text>
+  <rect class="box" x="40" y="168" width="158" height="70" rx="9"/><text class="t" x="54" y="196">Instagram</text><text class="s" x="54" y="216">comments · Direct</text>
+  <rect class="box" x="40" y="300" width="158" height="96" rx="9"/><text class="t" x="54" y="328">Graph API</text><text class="s" x="54" y="348">GET: context, read-back</text><text class="s" x="54" y="366">POST: one write per</text><text class="s" x="54" y="382">attempt</text>
+
+  <!-- API -->
+  <rect class="grp" x="260" y="40" width="230" height="230" rx="12"/>
+  <text class="g" x="276" y="66">API PROCESS · FASTIFY</text>
+  <rect class="box" x="276" y="84" width="198" height="72" rx="9"/><text class="t" x="290" y="111">Webhook gateway</text><text class="s" x="290" y="131">HMAC over raw bytes</text><text class="s" x="290" y="147">200 only after COMMIT</text>
+  <rect class="box" x="276" y="170" width="198" height="84" rx="9"/><text class="t" x="290" y="197">Normalizer</text><text class="s" x="290" y="217">4 surfaces → 1 event shape</text><text class="s" x="290" y="233">string ids · dedupe keys</text>
+
+  <!-- Postgres -->
+  <rect class="grp" x="530" y="40" width="250" height="380" rx="12"/>
+  <text class="g" x="546" y="66">POSTGRESQL</text>
+  <rect class="box" x="546" y="84" width="218" height="58" rx="9"/><text class="t" x="560" y="108">Inbox + queue</text><text class="s" x="560" y="127">receipts · events · pg-boss jobs</text>
+  <rect class="box" x="546" y="326" width="218" height="74" rx="9"/><text class="t" x="560" y="350">Reply state</text><text class="s" x="560" y="369">reply_items · publish_attempts</text><text class="s" x="560" y="385">one open attempt (unique index)</text>
+  <rect class="box" x="546" y="240" width="218" height="74" rx="9"/><text class="t" x="560" y="264">Releases + knowledge</text><text class="s" x="560" y="283">immutable, checksummed</text><text class="s" x="560" y="299">activation = audited pointer</text>
+  <rect class="box" x="546" y="154" width="218" height="74" rx="9"/><text class="t" x="560" y="178">Guards + audit</text><text class="s" x="560" y="197">CHECK constraints · triggers</text><text class="s" x="560" y="213">audit_events</text>
+
+  <!-- Worker -->
+  <rect class="grp" x="820" y="40" width="356" height="470" rx="12"/>
+  <text class="g" x="836" y="66">WORKER PROCESS</text>
+  <rect class="box" x="836" y="84" width="324" height="56" rx="9"/><text class="t" x="850" y="108">Context builder</text><text class="s" x="850" y="127">Graph re-read · thread · post caption · pseudonym</text>
+  <rect class="box" x="836" y="152" width="324" height="92" rx="9"/><text class="t" x="850" y="176">Decision pipeline</text><text class="s" x="850" y="196">signals → ① understanding → retrieval</text><text class="s" x="850" y="213">→ ② writer → validators → ③ check</text><text class="s" x="850" y="230">same code for live, Test Lab, replay</text>
+  <rect class="box" x="836" y="256" width="324" height="56" rx="9"/><text class="t" x="850" y="280">Autonomy policy + eligibility</text><text class="s" x="850" y="299">deterministic · fallback · human-only rules</text>
+  <rect class="box" x="836" y="324" width="156" height="72" rx="9"/><text class="t" x="850" y="348">Scheduler</text><text class="s" x="850" y="367">delay 0–60 min</text><text class="s" x="850" y="383">bursts merged</text>
+  <rect class="box" x="1004" y="324" width="156" height="72" rx="9"/><text class="t" x="1018" y="348">Dispatcher</text><text class="s" x="1018" y="367">lock · recheck</text><text class="s" x="1018" y="383">write-ahead</text>
+  <rect class="box" x="836" y="408" width="250" height="90" rx="9"/><text class="t" x="850" y="432">Reconciler</text><text class="s" x="850" y="451">outcome_unknown → read-back</text><text class="s" x="850" y="468">own-reply match · confirmed absent</text><text class="s" x="850" y="485">→ bounded resend (auto only, ≤ 3)</text>
+
+  <!-- Claude + Admin -->
+  <rect class="box" x="530" y="456" width="250" height="74" rx="9" style="fill:#fbf7f2;stroke:#ead9c4"/><text class="t" x="546" y="482">Anthropic Claude</text><text class="s" x="546" y="501">redacted text in, JSON schema out</text><text class="s" x="546" y="518">no token · no tools · no DB</text>
+  <rect class="box" x="260" y="330" width="230" height="110" rx="9" style="fill:#f3f7ff;stroke:#cfdcf7"/><text class="t" x="276" y="356">React admin console</text><text class="s" x="276" y="376">Messages · Knowledge · Test Lab</text><text class="s" x="276" y="393">Settings · Releases · Readiness</text><text class="s" x="276" y="414">session · CSRF · server-side roles</text>
+
+  <!-- edges: every arrow has its own head; no two arrows share a segment -->
+  <path class="e" d="M198 119 H276" marker-end="url(#a)"/>
+  <path class="e" d="M198 203 H232 V140 H276" marker-end="url(#a)"/>
+  <text class="l" x="203" y="111">signed</text>
+  <path class="e" d="M375 156 V170" marker-end="url(#a)"/>
+  <path class="e" d="M474 212 H510 V113 H546" marker-end="url(#a)"/>
+  <text class="l" x="480" y="102">1 txn</text>
+  <path class="e" d="M764 113 H836" marker-end="url(#a)"/>
+  <text class="l" x="784" y="104">job</text>
+  <path class="e" d="M998 140 V152" marker-end="url(#a)"/>
+  <path class="e" d="M998 244 V256" marker-end="url(#a)"/>
+  <path class="e" d="M914 312 V324" marker-end="url(#a)"/>
+  <path class="e" d="M992 360 H1004" marker-end="url(#a)"/>
+  <path class="e" d="M1040 396 V408" marker-end="url(#a)"/>
+  <path class="e" d="M836 198 H800 V499 H780" marker-end="url(#a)"/>
+  <text class="l" x="806" y="524">AI calls</text>
+  <path class="e" d="M764 284 H836" marker-end="url(#a)"/>
+  <text class="l" x="768" y="277">pins</text>
+  <path class="e" d="M836 360 H764" marker-end="url(#a)"/>
+  <text class="l" x="768" y="353">state</text>
+  <path class="e" d="M490 380 H546" marker-end="url(#a)"/>
+  <path class="e" d="M490 340 H518 V290 H546" marker-end="url(#a)"/>
+  <text class="l" x="493" y="373">admin API</text>
+  <path class="e" d="M320 440 V546 H1128 V396" marker-end="url(#a)"/>
+  <text class="l" x="850" y="539">manual messages: same dispatcher, same rechecks</text>
+  <path class="wr" d="M1160 360 H1188 V560 H60 V396" marker-end="url(#w)"/>
+  <text class="lw" x="420" y="577">the only write path to Meta: one POST per attempt, exact text persisted first</text>
+  <path class="e" d="M836 112 H812 V20 H12 V348 H40" marker-end="url(#a)" stroke-dasharray="4 3"/>
+  <text class="l" x="420" y="15">GET-only reads (context, pre-send recheck, read-back)</text>
+
+  <text class="s" x="84" y="470">Model = one subsystem.</text>
+  <text class="s" x="84" y="488">Code decides eligibility;</text>
+  <text class="s" x="84" y="506">PostgreSQL enforces the</text>
+  <text class="s" x="84" y="524">publishing invariants</text>
+  <text class="s" x="84" y="542">a second time.</text>
+</svg>

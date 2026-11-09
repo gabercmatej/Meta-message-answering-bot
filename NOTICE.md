@@ -1,24 +1,29 @@
 # Notice
 
-Copyright © 2026 Matej Gaberc ([@gabercmatej](https://github.com/gabercmatej)). All rights reserved.
+Copyright © 2026 Matej Gaberc ([@gabercmatej](https://github.com/gabercmatej)) for the showcase
+material: documentation, diagrams, screenshots, the hero composition and the interactive demo in
+`apps/demo/`. All rights reserved.
 
-This repository is provided as a portfolio and engineering showcase. No licence to use the
-proprietary production implementation is granted unless explicitly stated. It describes the design
-and engineering of a production system I built, so that readers can understand the architecture,
-the safety decisions and the way the work was approached.
+This repository is a portfolio and engineering showcase of a production system built for
+**Pravnik na dlani**. It is provided so that readers can understand the architecture, the safety
+decisions and the way the work was approached.
 
 - **No licence is granted.** Publishing this material does not give anyone permission to use,
-  copy, modify or redistribute the implementation, the documentation or the illustrations,
-  in whole or in part. No open-source licence applies.
+  copy, modify or redistribute it, in whole or in part. No open-source licence applies unless a
+  file says otherwise.
+- **No production source code.** The current tree contains none. Production excerpts published
+  in October 2026 (`src-showcase/`) were removed pending documented authorization and remain only
+  in the Git history; they are not licensed for reuse. See [WHATS_PUBLIC.md](WHATS_PUBLIC.md).
 - **Client name.** "Pravnik na dlani" is named only to give the case study context. This
   repository is not an official channel of that service, and nothing here is legal advice.
-- **Synthetic and redacted material.** Product screenshots, examples, identifiers and conversations
-  use synthetic data created for the showcase. They do not show real users, real messages, real
-  account identifiers or production credentials. Two operational screenshots (the Meta Developer
-  app and the hosting control panel) are real and were redacted: the App ID and the server account
-  path are removed.
-- **Not the production codebase.** The production source code, its history, the knowledge base
-  and the evaluation data remain private. The source excerpts in `src-showcase/` are
-  representative, sanitized extracts, not a complete or runnable release.
+- **Synthetic and redacted material.** Product screenshots were captured from the real admin
+  console running locally on synthetic data, with a scripted model and a fake Meta transport. The
+  demo names Pravnik na dlani as the simulated account (with its own monogram, not the
+  company's logo), but every business fact in it (prices, hours, links) is a fictional demo value
+  and is marked as such in the interface. The screenshots in
+  `screenshots/archive-2026-10-01/` are the October set, captured the same way from an environment
+  seeded with invented data. Nothing here shows real users, real messages, account identifiers or credentials.
+- **Not the production codebase.** The full source, its history, the prompts, the knowledge base
+  and the evaluation data remain private.
 
 For questions about this work, please open an issue on this repository.
