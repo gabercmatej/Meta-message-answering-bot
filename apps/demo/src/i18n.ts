@@ -152,7 +152,7 @@ const SL: Dict = {
   footerCredit: 'Arhitektura in izvorna koda',
   wordmark: 'Arhitektura sporočanja',
   heroTitle: 'Pošljite sporočilo. Poglejte, kako potuje skozi produkcijski AI sistem.',
-  heroSub: 'Simulirana pogovora na štirih družbenih površinah, sledena skozi pravo arhitekturo: webhook, čakalna vrsta, razvrstitev, znanje, validacija, dostava.',
+  heroSub: 'Simuliran pogovor na štirih družbenih površinah, prikazan skozi pravo arhitekturo: webhook, čakalna vrsta, razvrstitev, znanje, validacija, dostava.',
   modes: { instagram_dm: 'Instagram DM', messenger: 'Messenger', instagram_comment: 'Instagram komentar', facebook_comment: 'Facebook komentar' },
   modeGroup: 'Družbena površina',
   modeSim: { instagram_dm: 'DM v slogu Instagrama · simulirano', messenger: 'DM v slogu Messengerja · simulirano', instagram_comment: 'Komentar v slogu Instagrama · simulirano', facebook_comment: 'Komentar v slogu Facebooka · simulirano' },
