@@ -7,8 +7,9 @@ the repository is checked before publishing see [SECURITY.md](SECURITY.md).
 ## Synthetic
 
 - **The interactive demo** ([`apps/demo/`](apps/demo/)): a browser-only simulation of the pipeline.
-  Fictional firm ("Demo Legal Desk"), fictional knowledge, deterministic matching instead of a
-  model, no network access.
+  The account is shown as Pravnik na dlani (own monogram, not the company logo), but all business
+  facts are fictional demo values and marked as such; people are invented; deterministic matching
+  replaces the model; no network access. Live at https://meta-message-answering-bot.vercel.app/.
 - **Everything in [`examples/`](examples/)**: records written for this showcase and shaped after the
   runtime schemas. None is taken from production data.
 - **The people, messages, posts and knowledge entries visible in the screenshots.**

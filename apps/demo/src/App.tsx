@@ -1,255 +1,222 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Chat, type Turn } from './components/Chat';
+import { TipProvider } from './components/common';
+import { DevView } from './components/DevView';
 import { Icon } from './components/Icon';
-import { Inspector } from './components/Inspector';
-import { Pipeline } from './components/Pipeline';
-import { DEFAULT_SCENARIO_ID, SCENARIOS } from './sim/scenarios';
+import { Comments } from './components/mocks/Comments';
+import { Dm } from './components/mocks/Dm';
+import type { ConvItem, DeliveryStatus } from './components/mocks/types';
+import { Results } from './components/Results';
+import { Suggestions } from './components/Suggestions';
+import { TopBar } from './components/TopBar';
+import { ArchGraph, describeWhere } from './graph/ArchGraph';
+import { useReducedMotion } from './hooks';
+import { DICT } from './i18n';
+import { buildRoute, compileTimeline } from './route';
+import { SCENARIOS } from './sim/scenarios';
 import { simulate } from './sim/simulator';
 import type { Channel, Fault, HistoryTurn, Lang, RunTrace } from './sim/types';
-import { STAGES } from './stages';
 import { usePlayback } from './usePlayback';
 
 const REPO_URL = 'https://github.com/gabercmatej/Meta-message-answering-bot';
-const DELAYS = [0, 60, 180] as const;
-
-type Theme = 'light' | 'dark' | 'system';
-
-function readTheme(): Theme {
-  try {
-    const t = window.localStorage.getItem('pnd-demo-theme');
-    return t === 'light' || t === 'dark' ? t : 'system';
-  } catch {
-    return 'system';
-  }
-}
-
-/** Compact sticky run indicator for narrow screens, where the pipeline sits far below the chat. */
-function MobileProgress({ run, stage, countdown, done }: { run: RunTrace | null; stage: number; countdown: number | null; done: boolean }) {
-  const total = STAGES.length;
-  const jump = () => {
-    const el = document.getElementById('pipeline');
-    if (!el) return;
-    el.scrollIntoView({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
-    el.focus({ preventScroll: true });
-  };
-  let text = 'Pipeline idle · send a message';
-  let pct = 0;
-  if (run) {
-    if (done) {
-      text = `Run complete · ${run.finalState}`;
-      pct = 100;
-    } else {
-      const s = STAGES[Math.min(stage, total - 1)]!;
-      text = `Stage ${stage + 1}/${total} · ${s.title}${countdown !== null ? ` · ${countdown} s` : ''}`;
-      pct = (stage / total) * 100;
-    }
-  }
-  return (
-    <div className={`mprog ${run && !done ? 'running' : ''}`}>
-      <div className="mprog-row">
-        <span className="mprog-text" role="status" aria-live="polite">
-          {text}
-        </span>
-        <button className="link" onClick={jump}>
-          Show pipeline
-        </button>
-      </div>
-      <div className="mprog-bar" role="progressbar" aria-label="Pipeline progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
-        <span style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
-}
+const DELAY_SECONDS = 60;
+/** How long a chosen example stays visible in the composer before it is sent. */
+const TYPE_MS = 420;
 
 export function App() {
   const [channel, setChannel] = useState<Channel>('instagram_dm');
   const [lang, setLang] = useState<Lang>('en');
-  const [delay, setDelay] = useState<number>(60);
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [history, setHistory] = useState<HistoryTurn[]>([]);
-  const [run, setRun] = useState<RunTrace | null>(null);
-  const [scenario, setScenario] = useState<string | null>(null);
-  const [theme, setTheme] = useState<Theme>(readTheme);
+  const [dev, setDev] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [runs, setRuns] = useState<RunTrace[]>([]);
+  const [doneIds, setDoneIds] = useState<ReadonlySet<string>>(new Set());
+  const [viewIdx, setViewIdx] = useState<number | null>(null);
+  const [nonce, setNonce] = useState(0);
+  const [autoplay, setAutoplay] = useState(true);
+  const [pendingSend, setPendingSend] = useState(false);
   const runNo = useRef(0);
-  const started = useRef(false);
+  const timer = useRef<number | null>(null);
+  const deviceRef = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
+  const t = DICT[lang];
 
   useEffect(() => {
-    if (theme === 'system') document.documentElement.removeAttribute('data-theme');
-    else document.documentElement.setAttribute('data-theme', theme);
-    try {
-      window.localStorage.setItem('pnd-demo-theme', theme);
-    } catch {
-      /* storage unavailable: theme stays per page view */
-    }
-  }, [theme]);
+    document.documentElement.lang = lang;
+  }, [lang]);
+  useEffect(() => () => { if (timer.current !== null) window.clearTimeout(timer.current); }, []);
 
-  const onDone = useCallback((r: RunTrace) => {
-    const { input } = r;
-    setTurns((ts) => {
-      const next = [...ts];
-      if (r.replyText && r.repliesDelivered === 1) {
-        const tone = r.replySource === 'approved_fallback' ? 'fallback' : 'auto';
-        const meta =
-          r.finalState === 'reconciled_sent'
-            ? 'Sent automatically · confirmed by read-back'
-            : r.replySource === 'approved_fallback'
-              ? 'Sent automatically · approved fallback'
-              : r.replySource === 'approved_text'
-                ? 'Sent automatically · approved text'
-                : 'Sent automatically · delivery confirmed';
-        next.push({ id: `${r.id}-bot`, role: 'bot', text: r.replyText, meta, tone });
-      } else if (r.finalState === 'needs_review') {
-        next.push({ id: `${r.id}-sys`, role: 'system', tone: 'hold', text: 'Held for a person: hard safety signal, no automatic reply. In production a staff member answers from the admin inbox.' });
-      } else if (r.finalState === 'skipped') {
-        next.push({ id: `${r.id}-sys`, role: 'system', tone: 'skip', text: 'No reply: a public remark without a question is skipped (no person needed).' });
-      }
-      return next;
-    });
-    setHistory((h) => (r.replyText && r.repliesDelivered ? [...h, { role: 'bot', text: r.replyText }] : h));
-    void input;
+  const last = runs[runs.length - 1] ?? null;
+  const busy = !!last && !doneIds.has(last.id);
+  const shownIdx = viewIdx ?? runs.length - 1;
+  const shown = runs[shownIdx] ?? null;
+
+  const { steps, timeline } = useMemo(() => {
+    if (!shown) return { steps: [], timeline: null };
+    const s = buildRoute(shown);
+    return { steps: s, timeline: compileTimeline(s) };
+  }, [shown]);
+
+  const playKey = shown ? `${shown.id}#${nonce}` : null;
+  const onDone = useCallback((key: string) => {
+    const id = key.split('#')[0]!;
+    setDoneIds((s) => (s.has(id) ? s : new Set(s).add(id)));
   }, []);
-
-  const pb = usePlayback(run, onDone);
-  const busy = !!run && !pb.done;
+  const playback = usePlayback(playKey, timeline, { delaySeconds: DELAY_SECONDS, autoplay, onDone });
 
   const send = useCallback(
-    (text: string, opts?: { channel?: Channel; lang?: Lang; fault?: Fault; fresh?: boolean }) => {
+    (text: string, opts?: { channel?: Channel; fault?: Fault; fresh?: boolean }) => {
+      const clean = text.trim();
+      if (!clean) return;
       const ch = opts?.channel ?? channel;
-      const lg = opts?.lang ?? lang;
-      const hist = opts?.fresh ? [] : history;
+      const fresh = !!opts?.fresh;
+      const prev = fresh ? [] : runs;
+      const history: HistoryTurn[] = [];
+      for (const r of prev) {
+        history.push({ role: 'user', text: r.input.text, topic: r.classification.topic });
+        if (doneIds.has(r.id) && r.replyText && r.repliesDelivered) history.push({ role: 'bot', text: r.replyText });
+      }
       runNo.current += 1;
-      const trace = simulate({ runNo: runNo.current, channel: ch, lang: lg, text, fault: opts?.fault ?? 'none', delaySeconds: delay, history: hist });
-      setTurns((ts) => [...(opts?.fresh ? [] : ts), { id: `${trace.id}-user`, role: 'user', text }]);
-      setHistory([...hist, { role: 'user', text, topic: trace.classification.topic }]);
-      setRun(trace);
+      const trace = simulate({ runNo: runNo.current, channel: ch, lang, text: clean, fault: opts?.fault ?? 'none', delaySeconds: DELAY_SECONDS, history });
+      setRuns([...prev, trace]);
+      setViewIdx(null);
+      setAutoplay(true);
+      setNonce((n) => n + 1);
+      setDraft('');
     },
-    [channel, lang, history, delay]
+    [channel, lang, runs, doneIds]
   );
 
-  const reset = useCallback(() => {
-    setTurns([]);
-    setHistory([]);
-    setRun(null);
-    setScenario(null);
-  }, []);
+  const typeThenSend = useCallback(
+    (text: string, opts?: { channel?: Channel; fault?: Fault; fresh?: boolean }) => {
+      if (busy || pendingSend) return;
+      setDraft(text);
+      setPendingSend(true);
+      timer.current = window.setTimeout(() => {
+        setPendingSend(false);
+        send(text, opts);
+      }, reduced ? 60 : TYPE_MS);
+    },
+    [busy, pendingSend, send, reduced]
+  );
 
-  const playScenario = useCallback(
-    (id: string, lg: Lang = lang) => {
+  const onExample = useCallback(
+    (id: string) => {
       const s = SCENARIOS.find((x) => x.id === id);
       if (!s) return;
-      setScenario(id);
-      setChannel(s.channel);
-      send(s.text[lg], { channel: s.channel, lang: lg, fault: s.fault, fresh: true });
+      if (s.channel !== channel) {
+        setChannel(s.channel);
+        setRuns([]);
+        setDoneIds(new Set());
+        setViewIdx(null);
+      }
+      typeThenSend(s.text[lang], { channel: s.channel, fault: s.fault, fresh: true });
     },
-    [lang, send]
+    [channel, lang, typeThenSend]
   );
 
-  // Default first experience: one successful automated reply, so the whole pipeline is visible.
-  useEffect(() => {
-    if (started.current) return;
-    const t = window.setTimeout(() => {
-      started.current = true;
-      playScenario(DEFAULT_SCENARIO_ID, 'en');
-    }, 450);
-    return () => window.clearTimeout(t);
-  }, [playScenario]);
-
   const changeChannel = (c: Channel) => {
-    if (busy) return;
-    if (c !== channel) reset();
+    if (busy || pendingSend || c === channel) return;
     setChannel(c);
+    setRuns([]);
+    setDoneIds(new Set());
+    setViewIdx(null);
+    setDraft('');
   };
 
-  const schedStage = run?.stages.findIndex((s) => s.id === 'schedule') ?? -1;
-  const pending = useMemo(() => {
-    if (!run || !run.replyText || pb.done || schedStage < 0) return null;
-    const sched = run.stages[schedStage];
-    if (!sched || sched.status !== 'ok') return null;
-    if (pb.stage === schedStage) return { countdown: pb.countdown, text: run.replyText, phase: 'scheduled' as const };
-    if (pb.stage > schedStage) return { countdown: null, text: run.replyText, phase: 'sending' as const };
-    return null;
-  }, [run, pb.stage, pb.countdown, pb.done, schedStage]);
+  // Conversation shown on the device: replies exist only for runs whose playback has finished.
+  const items = useMemo<ConvItem[]>(() => {
+    const out: ConvItem[] = [];
+    for (const r of runs) {
+      out.push({ id: `${r.id}-u`, role: 'user', text: r.input.text });
+      if (!doneIds.has(r.id)) continue;
+      if (r.replyText && r.repliesDelivered === 1) out.push({ id: `${r.id}-b`, role: 'bot', text: r.replyText, tone: r.replySource === 'approved_fallback' ? 'fallback' : 'auto' });
+      else if (r.finalState === 'needs_review') out.push({ id: `${r.id}-s`, role: 'system', tone: 'hold', text: t.device.heldNote });
+      else if (r.finalState === 'skipped') out.push({ id: `${r.id}-s`, role: 'system', tone: 'skip', text: t.device.skippedNote });
+    }
+    return out;
+  }, [runs, doneIds, t]);
 
-  const fault = SCENARIOS.find((s) => s.id === scenario)?.fault ?? 'none';
+  const shownIsLast = shown !== null && last !== null && shown.id === last.id;
+  const lastDone = !!last && doneIds.has(last.id);
+  let status: DeliveryStatus = null;
+  if (last) {
+    if (lastDone) status = last.repliesDelivered === 1 ? 'seen' : 'delivered';
+    else status = shownIsLast && playback.view.accepted ? 'delivered' : 'sent';
+  }
+  const typing = busy && shownIsLast && playback.view.returning && !playback.view.done;
+
+  const mockProps = { t, lang, items, typing, status, busy: busy || pendingSend, draft, setDraft, onSend: () => send(draft) };
+  const showResults = !!shown && doneIds.has(shown.id);
+  const idle = runs.length === 0;
+  const where = describeWhere(t, playback.view, idle);
+
+  const replay = useCallback(() => {
+    setAutoplay(true);
+    setNonce((n) => n + 1);
+  }, []);
+  const select = useCallback((i: number) => {
+    setViewIdx(i);
+    setAutoplay(false);
+    setNonce((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!dev) return;
+    const id = window.setTimeout(() => document.querySelector('[data-devview]')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' }), 80);
+    return () => window.clearTimeout(id);
+  }, [dev, reduced]);
+
+  const jumpToGraph = () => document.getElementById('graph-anchor')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
 
   return (
-    <div className="app">
-      <header className="top">
-        <div className="brand">
-          <span className="logo" aria-hidden="true">
-            <Icon name="bolt" size={16} />
-          </span>
-          <div>
-            <h1>Message Processing Playground</h1>
-            <p>The PND Meta messaging pipeline, step by step</p>
-          </div>
-        </div>
-        <div className="top-actions">
-          <label className="delay">
-            <span>Reply delay</span>
-            <select value={delay} onChange={(e) => setDelay(Number(e.target.value))} disabled={busy} aria-label="Automatic reply delay">
-              {DELAYS.map((d) => (
-                <option key={d} value={d}>
-                  {d} s
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="ghost icon-btn" onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark')} aria-label={`Theme: ${theme}`} title={`Theme: ${theme}`}>
-            <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
+    <TipProvider>
+      <div className="app" data-channel={channel}>
+        <TopBar t={t} channel={channel} onChannel={changeChannel} lang={lang} onLang={(l) => !busy && setLang(l)} dev={dev} onDev={setDev} locked={busy || pendingSend} />
+
+        <section className="hero">
+          <h2>{t.heroTitle}</h2>
+          <p>{t.heroSub}</p>
+        </section>
+
+        {busy && (
+          <button className="mprog" onClick={jumpToGraph} aria-label={where}>
+            <span className="dot live" aria-hidden="true" />
+            <span className="mprog-text">{where}</span>
+            <Icon name="chevron-down" size={14} />
           </button>
-          <a className="ghost repo" href={REPO_URL} target="_blank" rel="noreferrer">
-            <Icon name="github" /> <span>Source &amp; case study</span>
-          </a>
-        </div>
-      </header>
+        )}
 
-      <div className="honesty" role="note">
-        <Icon name="shield" size={15} />
-        <span>
-          <strong>Interactive architecture simulation — no real AI or Meta API calls.</strong> Replies come from a deterministic script and fictional demo knowledge, so the routing, retrieval, scheduling and delivery mechanics are visible. Nothing leaves your browser.
-        </span>
+        <main className="stage">
+          <div className="stage-device">
+            <div className="device" ref={deviceRef} data-device>
+              <div className="bezel">
+                <div className="statusbar" aria-hidden="true">
+                  <span>9:41</span>
+                  <span className="sb-right"><i className="sig" /><i className="wifi" /><i className="batt" /></span>
+                </div>
+                <div className="screen">
+                  {channel === 'instagram_dm' && <Dm variant="ig" {...mockProps} />}
+                  {channel === 'messenger' && <Dm variant="messenger" {...mockProps} />}
+                  {channel === 'instagram_comment' && <Comments variant="ig" {...mockProps} />}
+                  {channel === 'facebook_comment' && <Comments variant="fb" {...mockProps} />}
+                </div>
+                <div className="home-bar" aria-hidden="true" />
+              </div>
+            </div>
+            <Suggestions t={t} lang={lang} disabled={busy || pendingSend} onSuggest={(text) => typeThenSend(text)} onExample={onExample} />
+          </div>
+          <div className="stage-graph" id="graph-anchor">
+            <ArchGraph t={t} lang={lang} trace={shown} steps={steps} playback={playback} reduced={reduced} deviceRef={deviceRef} onReplay={replay} />
+          </div>
+        </main>
+
+        {showResults && <Results t={t} lang={lang} runs={runs.filter((r) => doneIds.has(r.id))} selected={Math.min(shownIdx, runs.filter((r) => doneIds.has(r.id)).length - 1)} onSelect={select} onReplay={replay} />}
+        {dev && <DevView t={t} lang={lang} run={shown && doneIds.has(shown.id) ? shown : last && lastDone ? last : null} />}
+
+        <footer className="foot">
+          <span>{t.footer}</span>
+          <a href={REPO_URL} target="_blank" rel="noreferrer">{t.footerCredit}</a>
+        </footer>
       </div>
-
-      {fault !== 'none' && run && (
-        <div className="fault-banner">
-          <Icon name="alert" size={14} /> Injected fault: <code>{fault}</code> · {SCENARIOS.find((s) => s.id === scenario)?.note}
-        </div>
-      )}
-
-      <MobileProgress run={run} stage={pb.stage} countdown={pb.countdown} done={pb.done} />
-
-      <main className="grid">
-        <Chat
-          channel={channel}
-          lang={lang}
-          turns={turns}
-          busy={busy}
-          pending={pending}
-          onChannel={changeChannel}
-          onLang={(l) => !busy && setLang(l)}
-          onSend={(t) => {
-            setScenario(null);
-            send(t);
-          }}
-          onScenario={(id) => playScenario(id)}
-          onSendNow={pb.sendNow}
-          onReset={() => !busy && reset()}
-          activeScenario={scenario}
-        />
-        <Pipeline run={run} stage={pb.stage} countdown={pb.countdown} onSendNow={pb.sendNow} onSkip={pb.skipAll} />
-        <Inspector run={run} stage={pb.stage} lang={lang} />
-      </main>
-
-      <footer className="foot">
-        <span>Synthetic data only · deterministic simulator · no network calls</span>
-        <span>
-          Built by Matej Gaberc ·{' '}
-          <a href={REPO_URL} target="_blank" rel="noreferrer">
-            architecture &amp; source
-          </a>
-        </span>
-      </footer>
-    </div>
+    </TipProvider>
   );
 }

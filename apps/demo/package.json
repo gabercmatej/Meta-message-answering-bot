@@ -1,7 +1,9 @@
 {
   "name": "pnd-message-playground",
   "private": true,
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "version": "1.0.0",
   "type": "module",
   "description": "Interactive architecture simulation of the PND Meta messaging pipeline. No real AI or Meta API calls.",
@@ -14,6 +16,8 @@
     "check:browser": "node scripts/check.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },

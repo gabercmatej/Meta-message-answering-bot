@@ -1,11 +1,11 @@
 import type { KnowledgeEntry } from './types';
 
 /**
- * FICTIONAL demo knowledge. "Demo Legal Desk" does not exist; every price, link and service fact
- * here is invented for the simulation and is labelled as such in the UI. None of it is the
+ * FICTIONAL demo knowledge: every price, link, opening hour and service fact
+ * here is invented for the simulation and is labelled as fictional in the UI. None of it is the
  * production knowledge base of any real business.
  */
-export const FIRM = { en: 'Demo Legal Desk', sl: 'Demo pravna pisarna' } as const;
+export const FIRM = { en: 'Pravnik na dlani', sl: 'Pravnik na dlani' } as const;
 export const BOOKING_URL = 'https://example.com/book';
 
 export const KNOWLEDGE: ReadonlyArray<KnowledgeEntry> = [

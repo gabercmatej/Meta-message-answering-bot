@@ -18,7 +18,9 @@ decisions and the way the work was approached.
   repository is not an official channel of that service, and nothing here is legal advice.
 - **Synthetic and redacted material.** Product screenshots were captured from the real admin
   console running locally on synthetic data, with a scripted model and a fake Meta transport. The
-  demo uses a fictional firm ("Demo Legal Desk") and fictional facts. The screenshots in
+  demo names Pravnik na dlani as the simulated account (with its own monogram, not the
+  company's logo), but every business fact in it (prices, hours, links) is a fictional demo value
+  and is marked as such in the interface. The screenshots in
   `screenshots/archive-2026-10-01/` are the October set, captured the same way from an environment
   seeded with invented data. Nothing here shows real users, real messages, account identifiers or credentials.
 - **Not the production codebase.** The full source, its history, the prompts, the knowledge base

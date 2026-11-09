@@ -28,7 +28,7 @@ interface Rule {
 const RULES: Rule[] = [
   { topic: 'distress', weight: 100, stems: ['hurt myself', 'kill myself', 'end my life', 'suicid', 'threaten to kill', 'he will kill', 'in danger', 'samomor', 'ubil bom', 'ubila bom', 'koncati zivljenje', 'v nevarnosti', 'me bo ubil'] },
   { topic: 'complaint_about_us', weight: 9, stems: ['your service is', 'you are useless', 'terrible service', 'never answered me', 'vasa storitev je', 'slaba storitev', 'niste odgovorili', 'nezadovolj'] },
-  { topic: 'unpaid_salary', weight: 8, stems: ['unpaid', 'not paid', 'hasnt paid', 'has not paid', 'didnt pay', 'salary', 'wage', 'paycheck', 'ne izplaca', 'neizplac', 'ni izplacal', 'placa ', 'place ', 'placo ', 'plac ', 'regres'] },
+  { topic: 'unpaid_salary', weight: 8, stems: ['unpaid', 'not paid', 'been paid', 'hasnt paid', 'has not paid', 'didnt pay', 'salary', 'wage', 'paycheck', 'ne izplaca', 'neizplac', 'ni izplacal', 'placa ', 'place ', 'placo ', 'plac ', 'regres'] },
   { topic: 'employment_termination', weight: 8, stems: ['fire me', 'fired', 'dismiss', 'terminat', 'notice period', 'laid off', 'odpoved', 'odpusti', 'odpustil', 'odpovedni rok', 'izgubil sluzbo', 'izgubila sluzbo'] },
   { topic: 'tenancy', weight: 8, stems: ['landlord', 'tenant', 'rent', 'lease', 'deposit', 'evict', 'najem', 'varscin', 'izselit', 'stanovanj'] },
   { topic: 'consumer', weight: 7, stems: ['refund', 'warranty', 'broken product', 'faulty', 'shop', 'store', 'seller', 'online order', 'reklamacij', 'garancij', 'trgovin', 'prodajal', 'vracilo denarja', 'pokvarjen'] },

@@ -10,9 +10,9 @@ Built and operated for [Pravnik na dlani](https://pravniknadlani.si/), a Sloveni
 
 `TypeScript` · `Node.js 22` · `PostgreSQL` · `pg-boss` · `Fastify` · `React` · `Anthropic Claude` · `Meta Graph API` · `Vitest`
 
-[**Interactive demo**](apps/demo/) · [What is public](WHATS_PUBLIC.md) · [Architecture](docs/architecture.md) · [Autonomous LIVE mode](docs/autonomous-live-mode.md) · [Engineering challenges](docs/engineering-challenges.md) · [Quick start](#quick-start) · [Screenshots](#the-product)
+[**▶ Live interactive demo**](https://meta-message-answering-bot.vercel.app/) · [What is public](WHATS_PUBLIC.md) · [Architecture](docs/architecture.md) · [Autonomous LIVE mode](docs/autonomous-live-mode.md) · [Engineering challenges](docs/engineering-challenges.md) · [Quick start](#quick-start) · [Screenshots](#the-product)
 
-**Run the demo locally:** `cd apps/demo && npm ci && npm run dev` (Node.js 20+, no keys, no backend; there is no hosted instance yet)
+**[Try the live demo →](https://meta-message-answering-bot.vercel.app/)** Send a message in an Instagram- or Facebook-style mock and watch it travel through the architecture. Browser-only simulation: no real AI, no Meta API, no backend.
 
 </div>
 
@@ -126,18 +126,36 @@ The current admin console. Synthetic data, real UI ([provenance](#screenshot-pro
 
 ## Interactive demo
 
-[`apps/demo`](apps/demo/) is a browser-only **architecture simulation**: type any message (English
-or Slovenian), pick Messenger, Instagram DM or a comment, and watch the 12 pipeline stages run:
-signature, normalization, context, intent, legal area, knowledge retrieval, validation or fallback,
-an accelerated 60 s countdown, a simulated Meta publish and delivery confirmation. Scenarios include
-duplicate webhooks (one reply), transient Meta failures (retry), and an AI outage (approved
-fallback). A Developer View shows the normalized event JSON, reason codes, state transitions and
-idempotency keys.
+**[Open the live demo](https://meta-message-answering-bot.vercel.app/)** · source in [`apps/demo`](apps/demo/)
 
-<p align="center"><img src="assets/demo/demo-pipeline.png" alt="Interactive demo: chat on the left, the twelve-stage pipeline with a countdown in the middle, decision and cited fictional knowledge on the right" width="100%"></p>
+Send a message from an Instagram-style or Messenger-style chat, or comment under an Instagram- or
+Facebook-style post (English or Slovenian), and watch the packet travel through the real topology:
+webhook and signature check, normalization and dedupe, the durable queue, context, classification,
+knowledge retrieval, the (simulated) model, the policy gate, validation, the scheduler, the only
+publisher, and delivery reconciliation. Each route follows the simulator's trace, so different
+messages take different paths: a human-only message stops at review, an AI outage takes the
+approved-fallback bypass, a duplicate webhook dies at the normalizer, a Meta 429 loops through retry,
+and an uncertain write is read back before anything is resent. The reply appears only after
+simulated delivery is confirmed; then the decision panel shows intent, legal area, risk, the route,
+cited knowledge and the delivery record, and the Developer View shows the timeline, payloads and
+publish attempts.
 
-**No real AI, no Meta API, no backend.** Deterministic and free to host.
-Run it with `cd apps/demo && npm ci && npm run dev`. Deployment: [apps/demo/README.md](apps/demo/README.md).
+<p align="center"><img src="assets/demo/demo-desktop-processing.png" alt="Interactive demo: an Instagram-style DM on the left; on the right the architecture graph with a message packet travelling from the queue to the worker" width="100%"></p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/demo/demo-desktop-complete.png" alt="Completed run with the reply delivered and the decision panel"><br><b>After delivery.</b> The lit trail is the route this message took; the panel explains the decision.</td>
+    <td width="50%" valign="top"><img src="assets/demo/demo-comment.png" alt="Facebook-style comment under a post with the bot reply nested underneath"><br><b>Comment mode.</b> A public reply under a post, never personal details in public.</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="assets/demo/demo-developer.png" alt="Developer view with a lane-badged timeline and an inspector showing publish attempts"><br><b>Developer view.</b> Timeline by subsystem, payloads and publish attempts (here: outcome unknown → read-back → resend).</td>
+    <td valign="top"><img src="assets/demo/demo-mobile-complete.png" alt="Mobile layout of the demo" width="60%"><br><b>Mobile.</b> Social mock first, the graph below.</td>
+  </tr>
+</table>
+
+**No real AI, no Meta API, no backend.** Replies and decisions are deterministic stand-ins; business
+facts are fictional demo records and are marked as such in the UI. People are invented.
+Run it locally with `cd apps/demo && npm ci && npm run dev`. Details: [apps/demo/README.md](apps/demo/README.md).
 
 ## Architecture
 
@@ -262,8 +280,8 @@ git clone https://github.com/gabercmatej/Meta-message-answering-bot.git
 cd Meta-message-answering-bot
 
 # 1. Interactive demo (no keys, no backend)
-cd apps/demo && npm ci && npm run dev          # http://localhost:5173 (no hosted instance yet)
-npm test && npm run build                      # 78 tests, static build
+cd apps/demo && npm ci && npm run dev          # http://localhost:5173
+npm test && npm run build                      # 144 unit tests, static build
 ```
 
 Node.js 20+. No database, network access or credentials. What the public build
@@ -292,7 +310,7 @@ does **not** include, and what a real integration would need: [docs/adapting.md]
 | 26–28 Oct | r4 **autonomy-v1**: tiered autonomy, bounded legal orientation, DM bursts, own-reply matching fix, configurable delay, approved fallback level |
 | 28–29 Oct | All four Meta endpoints write-verified (owner-reported); manual messages after automatic replies; paid r4 run 269a650d fails one gate → scorer and price-stripper fixes |
 | 3 Nov | r5: mandatory formal address, narrowed risk signals; `owner-approved-v1` releases; **full autonomy** (AI-failure fallback, resend after confirmed absence, operator alerts); r5 LIVE at 60 s |
-| 9 Nov | Showcase v2: current screenshots, interactive demo; engine extract prepared, held pending authorization |
+| 9 Nov | Showcase v2: current screenshots, live interactive architecture demo; engine extract prepared, held pending authorization |
 
 → [docs/evolution.md](docs/evolution.md)
 
