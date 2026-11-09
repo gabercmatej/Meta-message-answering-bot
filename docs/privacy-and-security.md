@@ -98,18 +98,25 @@ planned but not finished, it says so.
   not answered, and stale backlog is expired instead of being answered late in a burst.
 - **Failed jobs** move to a dead-letter queue with bounded retention and are surfaced to operators
   as failed events.
-- **Honest status:** a general retention policy for all derived data (decision records,
-  evaluation snapshots, audit history) and an end-user data-deletion workflow are planned but not
-  yet complete. They are tracked as launch prerequisites.
+- **Honest status (9 Nov 2026, the system is LIVE):** not complete. Reviewer-context data (sender
+  names, avatars, thumbnails) is pruned automatically, as above. The code has no general retention
+  job for stored message text, decision records, evaluation snapshots or audit history, and the
+  private owner-inputs list records the retention decision for stored message text and a public
+  data-deletion route as open. Both are known gaps, not finished controls.
 
 ## Production safety around publishing
 
-- **Human approval.** In the current operating mode, a person approves every reply before it is sent.
-  The system starts in OFF by default, and the replay and shadow modes have no way to publish.
+- **Automatic replies with a delay, human takeover and hard holds.** In production (LIVE since
+  3 Nov 2026) replies that pass the eligibility checks are sent automatically after a delay
+  (60 s), during which staff can send, cancel or write a message of their own. Threats, self-harm,
+  distress, minors, injection, privacy requests and refund disputes always go to a person. The
+  system defaults to OFF, and the replay and shadow modes have no way to publish. See
+  [autonomous-live-mode.md](autonomous-live-mode.md).
 - **Write-ahead state.** The exact outgoing text and the attempt state are saved before the request
   to the platform.
 - **Unknown outcomes are never resent blindly.** A timeout or crash after a write can mean the reply
-  was posted. Such attempts are marked `outcome_unknown` and reconciled first.
+  was posted. Such attempts are marked `outcome_unknown` and reconciled by read-back first; only an
+  automatic reply that Meta verifiably lacks is resent (at most 3 attempts), never a person's.
 - **Last-moment re-checks.** Just before sending, the system re-checks pause state, mode, scope,
   whether the source still exists, human takeover, prior replies and release validity.
 - **No replies to itself.** Echoes of the brand's own messages are recognized and ignored.
@@ -122,15 +129,14 @@ blank directory using an allow-list approach:
 - **Fresh, independent history.** The repository was initialized empty. No commits, branches or
   objects from the private repository were copied, so private history cannot leak through Git.
 - **Allow-list, not deny-list.** Each file was written specifically for the showcase. Nothing was
-  bulk-copied. Production source code, deployment material, certificates, logs, environment files
-  and database dumps are absent.
+  bulk-copied. Production source code (apart from the five trimmed excerpts in `src-showcase/`),
+  deployment material, certificates, logs, environment files and database dumps are absent.
 - **No private knowledge or evaluation data.** The legal knowledge base, prompts, evaluation cases
   and harvested historical conversations stay private. Examples here are synthetic and
   written for illustration.
-- **Synthetic product screenshots, redacted operational ones.** Product screenshots come from an
-  environment seeded with invented conversations, names and identifiers. No real user, message or
-  account identifier appears. Two operational screenshots (the Meta Developer app and the hosting
-  control panel) are real and were redacted: the App ID and the server account path are removed.
+- **Synthetic screenshots.** Product screenshots come from the real admin build run locally on
+  invented conversations, names and identifiers, with a scripted model and a fake Meta transport.
+  No real user, message or account identifier appears.
 - **Automated leak scanning before publishing.** Before publishing, the tree was scanned for
   credentials, platform identifiers, personal data patterns, internal hostnames and paths, image
   metadata, and verbatim overlap with the private corpus. Every finding was reviewed by hand.

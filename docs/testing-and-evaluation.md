@@ -10,15 +10,93 @@ Two separate things, labelled separately:
   human ratings say anything about reply quality.
 
 No routine automated test performs a production public write, and no test calls the real Meta API
-or a real model.
+or a real model. Real-model runs are separate, explicitly cost-capped commands, and their results
+are reported below with their run ids.
 
 ## Measured test results
 
-Measured on **1 October 2026** against the private repository, in a fresh
-clone (no `.env`, no credentials in the environment), Node.js 22.17.0 on Windows, integration tests against embedded real PostgreSQL.
+### At the production commit (`8e22656`, 3 November 2026)
 
-The gate is `npm run check`: lint, then typecheck, unit tests, PostgreSQL integration tests and
-build.
+The gate is `npm run check`: lint, typecheck (server and admin), unit tests, PostgreSQL
+integration tests and build. All of it passed at the commit that runs in production. The suite
+uses scripted model outputs and a fake Meta transport, with integration tests against real
+embedded PostgreSQL.
+
+### Re-run for this showcase
+
+Re-run on **9 November 2026** on the same commit, in the private checkout with `DATABASE_URL`
+forced empty (throwaway embedded PostgreSQL), Node.js 22.17.0 on Windows, no credentials, no
+network calls to Meta or a model provider:
+
+| Suite | Whole repository | Messaging bot only (Content Bot excluded) |
+|---|---|---|
+| Unit + contract | **3,985 passed / 0 failed**, 204 files | **2,808 passed**, 116 files |
+| Integration (real PostgreSQL) | **886 passed / 0 failed**, 86 files | **593 passed / 0 failed**, 49 files |
+| Total | **4,871** | **3,401** |
+
+The repository also contains a separate Content Bot product (social content planning), added on
+5 October 2026. Its tests are in the left column, so the right column is the figure that belongs to
+the messaging platform described here. The README quotes both.
+
+### Growth
+
+| Date | Commit | Unit | Integration | Note |
+|---|---|---:|---:|---|
+| 1 Oct 2026 | `80cdc96` | 511 | 222 | messaging bot only (before the Content Bot existed) |
+| 26 Oct 2026 | `ff4b49e` | 3,450 | 844 | whole repository |
+| 29 Oct 2026 | `56c26d5` | 3,872 | 875 | whole repository |
+| 3 Nov 2026 | `8e22656` | 3,985 | 886 | whole repository; messaging bot only: 2,808 unit, 593 integration (3,401) |
+
+## Real-model measurements
+
+These come from the project log. Each is labelled by what it measures. **None of them is an
+"accuracy" of the whole system, and none should be combined with another.**
+
+| Date | Run | Setup | Result | What it measures |
+|---|---|---|---|---|
+| 30 Sep | first real evaluation | fresh Anthropic, synthetic corpus | failed gates → root causes fixed → r2 | engineering feedback |
+| 26 Oct | `13bd671a` | fresh, 105 required cases, r3 deployed | 99 pass / 6 fail | per-case pass rate |
+| 26 Oct | `be045cb6` | fresh, 105 required cases | 101 pass / 4 fail | per-case pass rate |
+| 27 Oct | `ab819627` | fresh, r4 | action accuracy 98 % (pass); auto-reply precision 94.4 % (fail); 1 critical | gates |
+| 28 Oct | real-model **dry run** | real models through the real pipeline, LIVE eligibility, dispatcher recheck; nothing published; ≈ 1.91 € | **92/93 legitimate messages auto-sent (98.9 %)** on all four channels; **0/11** human-control cases sent; 0 unsolicited amounts | automatic-handling rate on a curated set |
+| 29 Oct | `269a650d` | fresh, dataset `pnd-legal-v3` v4, 107 required | 107/107 completed; action accuracy **98.1 %** (pass); auto-reply appropriateness **90.5 %** (fail, gate ≥ 98 %); 2 reported critical (both scorer false positives on correctly declined statements) | gates; diagnosis → `56c26d5` |
+| 3 Nov | r5 run | fresh, dataset v5, 134 required | 134/134 completed; gates **failed** | gates |
+
+The r4 release was later approved and ran LIVE in production (owner-reported). The project log
+records that its LIVE authorization was computed from evaluation evidence over the 107 required
+cases (it authorized 5 intents), but it does not record the id or the gate results of the approving
+run, so this page quotes no number for it. The r5 release was approved differently: by the owner
+(`owner-approved-v1`, 3 Nov) after its own run failed the gates, with `evaluatedCases: 0`.
+
+**How to read the 98.9 %.** It is the share of legitimate messages in a curated real-model dry
+run that the system would have sent automatically, with real models and the real eligibility and
+dispatcher checks. It is a coverage and safety measurement (and 0 of 11 human-only controls were
+sent). It is not a judgment of reply quality, and it is not production traffic.
+
+**Production evidence** (owner-reported, not instrumented in this repository): r5 LIVE since
+3 November 2026 with automatic replies delivered on Facebook and Instagram; `release-status`
+reports automatic coverage as handled versus delivered, plus an ATTENTION line for failed deliveries.
+No production conversation content is published here.
+
+### Stored-output coverage estimates (zero model cost)
+
+Replays of stored model outputs through newer policy code, used to measure what a policy change
+*would* do before paying for a fresh run. Engineering estimates, **not** quality:
+
+| Code | Default harness | Faithful harness¹ |
+|---|---:|---:|
+| r3 | 30.5 % | 51.4–52.4 % |
+| r4 `ff4b49e` | 50.5 % | — |
+| r4 `bce2574` | 66.7 % | 86.7 % |
+| r4 `9ccada6` | 68.6 % | 91.4 % |
+
+¹ The stand-in writer cites the retrieved items it quotes, as a real writer does.
+Safety in every row: 0 human-only cases auto-sent.
+
+## Snapshot from 1 October 2026
+
+The category breakdown below is the original **733-test** suite from the first showcase, kept for
+the project history. The messaging-bot suite has since grown about 4.6-fold (733 → 3,401 tests), and the categories still apply.
 
 | Stage | Result |
 |---|---|
@@ -27,10 +105,6 @@ build.
 | Unit + contract tests (Vitest) | **511 passed / 0 failed / 0 skipped**, 30 files, 5.1 s |
 | Integration tests (Vitest + real PostgreSQL) | **222 passed / 0 failed / 0 skipped**, 21 files |
 | Build (`tsc` + Vite admin build) | Pass |
-
-**Total: 733 automated tests (511 unit + 222 integration) in 51 files.** `tests/contract/` and
-`tests/e2e/` exist as directories but contain no tests yet. The admin workflow is covered through
-HTTP-level integration tests rather than browser tests.
 
 ## Test categories
 
@@ -106,6 +180,14 @@ Write verification:
 - Synthetic fixtures for end-to-end demos. Real customer exports and production corpora are kept
   out of Git.
 
+## Tests added since October (selection)
+
+- `full-autonomy.test.ts` (integration, 5) and `full-autonomy.test.ts` (unit, 50): the production DM that was held, off-topic, unclear, complaint, workplace harassment, AI timeouts, duplicate webhooks, throttling retry, unknown outcome found / absent → resent, permanent rejection + alert, emergencies held, on all four surfaces.
+- `owner-approval.test.ts`: dry run and refusals; approve + activate with the failed run left unchanged; LIVE with a 60 s delay (one formal reply per message on four channels, threat held); a simulated deploy stops sending until re-authorization.
+- `r4-comment-autosend.test.ts`: 8 owner messages × 4 surfaces = 32/32 scheduled and sent; unverified endpoint → `CAPABILITY_NOT_VERIFIED`; write-verify takes effect without a restart.
+- `manual-after-auto.test.ts` (14): manual messages after automatic replies, cancellation of pending automatic replies, dispatcher-started items not cancelled, closed DM window.
+- `r5-autosend.test.ts`: webhook → worker → eligibility → schedule → dispatcher → fake write, 24 items sent exactly once, all formal.
+
 ## Evaluation harness
 
 ### Datasets (counts only)
@@ -116,6 +198,12 @@ Write verification:
 | Synthetic Slovenian legal corpus | 90 | All synthetic; all 17 legal areas; 59 comments and 31 DMs; 56 Facebook and 34 Instagram; 24 flagged critical; splits: 53 dev, 24 holdout, 13 critical |
 | Knowledge snapshots | 1 file | Frozen knowledge for chronological replay |
 | Historical harvest | local only | Unlabelled public comments, read-only Graph, redacted, authors dropped. Never committed |
+
+**Since October:** the main dataset is `pnd-legal-v3` (version 5 in November), with 134 *required*
+cases (synthetic, operator-written and redacted historical cases) that include 27 autonomy cases on
+all four channels. Earlier versions had 105 and 107 required cases. Relabels are versioned and
+documented, with every forbidden-claim guard kept. A separate real-traffic report replays 191 harvested public
+comments through the deterministic gates only, with no model and nothing committed.
 
 Both committed corpora were written alongside the pipeline. Passing them is a smoke and regression
 signal, **not** an independent quality measurement.
@@ -148,7 +236,7 @@ facts, forbidden claims, required source ids).
 |---|---|
 | `fake` | Deterministic keyword stand-in. Tests rules and grounding only |
 | `recorded` | Replays captured model outputs by request hash. Engineering regressions |
-| `fresh` | A real model. The only kind that can support release approval for a release pinning a real model |
+| `fresh` | A real model. The only kind that counts as evaluation evidence for a release pinning a real model (an owner approval is the other, separately labelled basis) |
 
 ### Gates (`gates-v1`)
 
@@ -168,7 +256,8 @@ locally through the same pipeline and classified (retrieval, validator, policy, 
 dataset, evaluator). The fixes were made in code, prompts and evaluation logic without weakening any
 gate or changing labels, and each fixed case became a recorded-response regression test. The failed
 candidate stayed immutable with its failed evidence and was never approved. A new release was
-created, evaluated and approved on fresh-model evidence. A later production replay surfaced one
+created and evaluated on fresh-model evidence (the October releases were approved on it; since 3 Nov
+an owner approval is also possible, and r5 uses it). A later production replay surfaced one
 false positive in a forbidden-claim pattern (a correct negated statement); the pattern was made
 negation-aware with dedicated regression tests, without changing the release.
 

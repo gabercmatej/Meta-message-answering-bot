@@ -6,6 +6,8 @@ open-source release. They are trimmed for illustration and are **not runnable** 
 imports, helpers and most columns are omitted, and each file says what was cut. Short explanatory
 comments were added where they help a reader.
 
+They come from the October 2026 snapshot (REVIEW era); later behaviour, such as the automatic resend of a delivery that Meta verifiably lacks, is described in the documents, not here.
+
 They contain no secrets, tokens, identifiers, hostnames, prompts or knowledge content. Secrets such
 as the app secret are injected at runtime and never appear in source.
 
