@@ -8,9 +8,11 @@ scheduled automatic publishing and delivery confirmation, with a full operator c
 
 Built and operated for [Pravnik na dlani](https://pravniknadlani.si/), a Slovenian legal-services company.
 
+[![Try the live demo](https://img.shields.io/badge/▶_Try_the_live_demo-send_a_message,_watch_it_flow-6D5DFC?style=for-the-badge)](https://meta-message-answering-bot.vercel.app/)
+
 `TypeScript` · `Node.js 22` · `PostgreSQL` · `pg-boss` · `Fastify` · `React` · `Anthropic Claude` · `Meta Graph API` · `Vitest`
 
-[**▶ Live interactive demo**](https://meta-message-answering-bot.vercel.app/) · [What is public](WHATS_PUBLIC.md) · [Architecture](docs/architecture.md) · [Autonomous LIVE mode](docs/autonomous-live-mode.md) · [Engineering challenges](docs/engineering-challenges.md) · [Quick start](#quick-start) · [Screenshots](#the-product)
+[What is public](WHATS_PUBLIC.md) · [Architecture](docs/architecture.md) · [Autonomous LIVE mode](docs/autonomous-live-mode.md) · [Engineering challenges](docs/engineering-challenges.md) · [Quick start](#quick-start) · [Screenshots](#the-product)
 
 </div>
 
@@ -18,6 +20,13 @@ Built and operated for [Pravnik na dlani](https://pravniknadlani.si/), a Sloveni
   <img src="assets/hero-live-console.png" alt="The PND admin console in LIVE mode: the overview with replies sent automatically, a scheduled reply with its countdown, an automatic Messenger reply with bounded legal orientation, and the Test Lab decision view" width="100%">
 </p>
 <p align="center"><sub>The real admin console (Slovenian UI), run locally on synthetic people and messages, with the real pipeline and dispatcher, a scripted model and a fake Meta transport. <a href="#screenshot-provenance">How these were captured</a>.</sub></p>
+
+
+### ▶ Try it yourself
+
+**[meta-message-answering-bot.vercel.app](https://meta-message-answering-bot.vercel.app/)**: type a message as a client on Instagram DM, Messenger or a Facebook/Instagram comment, and watch it travel through the real architecture step by step: webhook, queue, classification, knowledge retrieval, decision policy, generation, deterministic validation, scheduling and confirmed delivery. Switch to *Developer view* to see the payload at every hop. Runs entirely in the browser on synthetic data.
+
+<a href="https://meta-message-answering-bot.vercel.app/"><img src="assets/demo/demo-desktop-processing.png" alt="Interactive demo: a client message travels through webhook, queue, classification, retrieval, decision, generation, validation and delivery" width="100%"></a>
 
 | | |
 |---|---|
