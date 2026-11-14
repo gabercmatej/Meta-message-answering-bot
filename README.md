@@ -24,7 +24,7 @@ Built and operated for [Pravnik na dlani](https://pravniknadlani.si/), a Sloveni
 
 ### ▶ Try it yourself
 
-**[meta-message-answering-bot.vercel.app](https://meta-message-answering-bot.vercel.app/)**: type a message as a client on Instagram DM, Messenger or a Facebook/Instagram comment, and watch it travel through the real architecture step by step: webhook, queue, classification, knowledge retrieval, decision policy, generation, deterministic validation, scheduling and confirmed delivery. Switch to *Developer view* to see the payload at every hop. Runs entirely in the browser on synthetic data.
+**[meta-message-answering-bot.vercel.app](https://meta-message-answering-bot.vercel.app/)**: type a message as a client on Instagram DM, Messenger or a Facebook/Instagram comment, and watch it travel through the real architecture step by step: webhook, queue, classification, knowledge retrieval, decision policy, generation, deterministic validation, scheduling and confirmed delivery. Switch on *Developer view* for the technical detail behind each step. Runs entirely in the browser on synthetic data.
 
 <a href="https://meta-message-answering-bot.vercel.app/"><img src="assets/demo/demo-desktop-processing.png" alt="Interactive demo: a client message travels through webhook, queue, classification, retrieval, decision, generation, validation and delivery" width="100%"></a>
 
