@@ -314,9 +314,7 @@ Designed, implemented and operated by **Matej Gaberc** ([@gabercmatej](https://g
 for Pravnik na dlani: Meta integration, the decision pipeline and autonomy policy, knowledge and
 release management, the React operator console, the publisher and reconciliation, evaluation
 tooling, deployment and production operations. All commits in the private repository come from
-the author's account. Much of the implementation was written with AI coding agents (Claude Code)
-working under the author's direction and review, as the project log records; the architecture,
-invariants, verification and production operation are the author's. Product and policy decisions,
+the author's account. Product and policy decisions,
 such as autonomy scope and the optional paid evaluation, were made by the business owner and are
 recorded as such.
 
